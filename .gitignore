@@ -1,0 +1,25 @@
+# Ignore image file
+
+# Ignore indicate file
+*.o
+.*
+*.*~
+*.map
+*.svg
+*.
+*.a
+*.cmd
+*.img
+*.bin
+Module.symvers
+*.ko
+*.order
+*.mod.c
+
+# Execte file
+
+# Ignore dirent
+
+!.gitignore
+# output
+
