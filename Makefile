@@ -101,6 +101,7 @@ install:
 clean:
 	@rm -rf *.ko *.o *.mod.o *.mod.c *.symvers *.order \
                .*.o.cmd .tmp_versions *.ko.cmd .*.ko.cmd \
-		src/*.o mm/*.o
+		mm/*.o arch/arm/*.o mm/.*.o.*  \
+		arch/arm/.*.o.*
 
 endif
