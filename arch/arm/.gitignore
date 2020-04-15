@@ -6,6 +6,10 @@
 .*.o.cmd
 .*.swp
 .*
+*.ko
+*.mod.c
+*.order
+*.symvers
 
 # Execte file
 
