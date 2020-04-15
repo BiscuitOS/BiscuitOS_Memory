@@ -26,6 +26,12 @@ unsigned long phys_initrd_start_bs __initdata = 0;
 unsigned long phys_initrd_size_bs __initdata = 0;
 unsigned long initrd_start_bs, initrd_end_bs;
 
+/*
+ * The sole use of this is to pass memory configuration
+ * data from paging_init to mem_init
+ */
+static struct meminfo meminfo_bs __initdata = { 0, };
+
 struct node_info {
 	unsigned int start;
 	unsigned int end;
@@ -331,4 +337,11 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 	int node;
 
 	bootmem_init_bs(mi);
+
+	memcpy(&meminfo_bs, mi, sizeof(meminfo_bs));
+
+	/*
+	 * allocate the zero page. Note that we count on this going ok.
+	 */
+	zero_page = alloc_bootmem_low_pages_bs(PAGE_SIZE);
 }

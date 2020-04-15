@@ -124,6 +124,129 @@ static void __init reserve_bootmem_core_bs(bootmem_data_t *bdata,
 		}
 }
 
+/*
+ * We 'merge' subsequest allocation to save space. We might 'lose'
+ * some fraction of a page if allocations cannot be satisfied due to
+ * size constraints on boxes where is physical RAM space fragmentation -
+ * in these cases (mostly large memory boxes) this is not a problem.
+ *
+ * On low memory boxes we get it right in 100% of the cases.
+ *
+ * alignment has to be a power of 2 value.
+ *
+ * NOTE: This function is _not_ reentrant.
+ */
+static void * __init
+__alloc_bootmem_core_bs(struct bootmem_data *bdata, unsigned long size,
+			unsigned long align, unsigned long goal)
+{
+	unsigned long offset, remaining_size, areasize, preferred;
+	unsigned long i, start = 0, incr, eidx;
+	void *ret;
+
+	if (!size) {
+		printk("__alloc_bootmem_core(): zero-sized request\n");
+		BUG();
+	}
+	BUG_ON(align & (align-1));
+
+	eidx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
+	offset = 0;
+	if (align &&
+		(bdata->node_boot_start & (align - 1UL)) != 0)
+		offset = (align - (bdata->node_boot_start & (align - 1UL)));
+	offset >>= PAGE_SHIFT;
+
+	/*
+	 * We try to allocate bootmem pages above 'goal'
+	 * first, then we try to allocate lower pages.
+	 */
+	if (goal && (goal >= bdata->node_boot_start) &&
+		((goal >> PAGE_SHIFT) < bdata->node_low_pfn)) {
+		preferred = goal - bdata->node_boot_start;
+
+		if (bdata->last_success >= preferred)
+			preferred = bdata->last_success;
+	} else
+		preferred = 0;
+
+	preferred = ((preferred + align - 1) & ~(align - 1)) >> PAGE_SHIFT;
+	preferred += offset;
+	areasize = (size+PAGE_SIZE-1)/PAGE_SIZE;
+	incr = align >> PAGE_SHIFT ? : 1;
+
+restart_scan:
+	for (i = preferred; i < eidx; i += incr) {
+		unsigned long j;
+
+		i = find_next_zero_bit(bdata->node_bootmem_map, eidx, i);
+		i = ALIGN(i, incr);
+		if (test_bit(i, bdata->node_bootmem_map))
+			continue;
+		for (j = i + 1; j < i + areasize; ++j) {
+			if (j >= eidx)
+				goto fail_block;
+			if (test_bit(j, bdata->node_bootmem_map))
+				goto fail_block;
+		}
+		start = i;
+		goto found;
+	fail_block:
+		i = ALIGN(j, incr);
+	}
+
+	if (preferred > offset) {
+		preferred = offset;
+		goto restart_scan;
+	}
+	return NULL;
+
+found:
+	bdata->last_success = start << PAGE_SHIFT;
+	BUG_ON(start >= eidx);
+
+	/*
+	 * Is the next page of the previous allocation-end the start
+	 * of this allocation's buffer? If yes then we can 'merge'
+	 * the previous partial page with this allocation.
+	 */
+	if (align < PAGE_SIZE &&
+		bdata->last_offset && bdata->last_pos+1 == start) {
+		offset = (bdata->last_offset+align-1) & ~(align-1);
+		BUG_ON(offset > PAGE_SIZE);
+		remaining_size = PAGE_SIZE - offset;
+		if (size < remaining_size) {
+			areasize = 0;
+			/* last_pos unchanged */
+			bdata->last_offset = offset+size;
+			ret = phys_to_virt_bs(bdata->last_pos*PAGE_SIZE +
+					offset + bdata->node_boot_start);
+		} else {
+			remaining_size = size - remaining_size;
+			areasize = (remaining_size+PAGE_SIZE-1)/PAGE_SIZE;
+			ret = phys_to_virt_bs(bdata->last_pos*PAGE_SIZE +
+					offset + bdata->node_boot_start);
+			bdata->last_pos = start+areasize-1;
+			bdata->last_offset = remaining_size;
+		}
+		bdata->last_offset &= ~PAGE_MASK;
+	} else {
+		bdata->last_pos = start + areasize - 1;
+		bdata->last_offset = size & ~PAGE_MASK;
+		ret = phys_to_virt_bs(start * PAGE_SIZE + 
+					bdata->node_boot_start);
+	}
+
+	/*
+	 * Reserve the area now:
+	 */
+	for (i = start; i < start+areasize; i++)
+		if (unlikely(test_and_set_bit(i, bdata->node_bootmem_map)))
+			BUG();
+	memset(ret, 0, size);
+	return ret;
+}
+
 unsigned long __init
 init_bootmem_node_bs(pg_data_t *pgdat, unsigned long freepfn,
 			unsigned long startpfn, unsigned long endpfn)
@@ -141,4 +264,22 @@ void __init reserve_bootmem_node_bs(pg_data_t *pgdat, unsigned long physaddr,
 					unsigned long size)
 {
 	reserve_bootmem_core_bs(pgdat->bdata, physaddr, size);
+}
+
+void * __init __alloc_bootmem_bs(unsigned long size, unsigned long align,
+		unsigned long goal)
+{
+	pg_data_t *pgdat = pgdat_list_bs;
+	void *ptr;
+
+	for_each_pgdat_bs(pgdat)
+		if ((ptr = __alloc_bootmem_core_bs(pgdat->bdata, 
+							size, align, goal)))
+			return (ptr);
+	/*
+	 * Whoops, we cannot satisfy the allocation request.
+	 */
+	printk(KERN_ALERT "bootmem alloc of %lu bytes failed!\n", size);
+	panic("Out of memory");
+	return NULL;
 }
