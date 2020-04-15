@@ -46,11 +46,12 @@
 /* RAM base address */
 phys_addr_t BiscuitOS_ram_base;
 phys_addr_t BiscuitOS_ram_size;
+phys_addr_t swapper_pg_dir_bs;
 
 /* Untouched command line (eg. for /proc) saved by arch-specific code. */
 char saved_command_line_bs[COMMAND_LINE_SIZE];
 /* Emulate Kernel image */
-unsigned long _text_bs, _end_bs;
+unsigned long _stext_bs, _end_bs;
 
 /* setup */
 extern void setup_arch_bs(char **);
@@ -109,8 +110,9 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		printk("Unable to read BiscuitOS kernel image.\n");
 		return -EINVAL;
 	}
-	_text_bs = array[0];
+	_stext_bs = array[0];
 	_end_bs  = array[0] + array[1];
+	swapper_pg_dir_bs = _stext_bs - 0x4000;
 
 	/* Obtain initrd information */
 	ret = of_property_read_u32_array(np, "initrd", array, 2);

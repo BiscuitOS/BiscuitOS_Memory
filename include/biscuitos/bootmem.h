@@ -31,5 +31,9 @@ typedef struct bootmem_data {
 extern unsigned long __init bootmem_bootmap_pages_bs(unsigned long);
 extern unsigned long __init init_bootmem_node_bs(pg_data_t *,
 				unsigned long, unsigned long, unsigned long);
+extern void __init free_bootmem_node_bs(pg_data_t *, 
+					unsigned long, unsigned long);
+extern void __init reserve_bootmem_node_bs(pg_data_t *, unsigned long,
+					unsigned long);
 
 #endif

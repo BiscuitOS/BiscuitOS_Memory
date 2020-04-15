@@ -15,6 +15,17 @@ Module.symvers
 *.ko
 *.order
 *.mod.c
+*.mod.o
+*.o.cmd
+*.mod.c
+*.symvers
+*.order
+.*.o.cmd
+*.tmp_versions
+.tmp_versions
+*.ko.cmd
+.*.ko.cmd
+*.*.ko.cmd
 
 # Execte file
 

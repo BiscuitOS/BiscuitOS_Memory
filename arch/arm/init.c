@@ -19,11 +19,12 @@
 #include "asm-generated/memory.h"
 
 /* BiscuitOS Emulate */
-extern unsigned long _text_bs;
+extern unsigned long _stext_bs;
 extern unsigned long _end_bs;
 
 unsigned long phys_initrd_start_bs __initdata = 0;
 unsigned long phys_initrd_size_bs __initdata = 0;
+unsigned long initrd_start_bs, initrd_end_bs;
 
 struct node_info {
 	unsigned int start;
@@ -203,6 +204,51 @@ static int __init check_initrd_bs(struct meminfo *mi)
 }
 
 /*
+ * Register all available RAM in this node with the bootmem allocator.
+ */
+static inline void free_bootmem_node_bank_bs(int node, struct meminfo *mi)
+{
+	pg_data_t *pgdat = NODE_DATA_BS(node);
+	int bank;
+
+	for (bank = 0; bank < mi->nr_banks; bank++)
+		if (mi->bank[bank].node == node)
+			free_bootmem_node_bs(pgdat, mi->bank[bank].start,
+				mi->bank[bank].size);
+}
+
+/*
+ * Reserve the various regions of node 0
+ */
+static __init void reserve_node_zero_bs(unsigned int bootmap_pfn, 
+						unsigned int bootmap_pages)
+{
+	pg_data_t *pgdat = NODE_DATA_BS(0);
+	unsigned long res_size = 0;
+
+	/*
+	 * Register the kernel text and data with bootmeme.
+	 * Note that this can only be in node 0.
+	 */
+	reserve_bootmem_node_bs(pgdat, __pa_bs(_stext_bs), 
+							_end_bs - _stext_bs);
+
+	/*
+	 * Reserve the page table. These are already in use,
+	 * and can only be in node 0.
+	 */
+	reserve_bootmem_node_bs(pgdat, __pa_bs(swapper_pg_dir_bs),
+			PTRS_PER_PGD * sizeof(pgd_t));
+
+	/*
+	 * And don't forget to reserve the allocator bitmap,
+	 * which will be freed later.
+	 */
+	reserve_bootmem_node_bs(pgdat, bootmap_pfn << PAGE_SHIFT,
+			bootmap_pages << PAGE_SHIFT);
+}
+
+/*
  * Initialise the bootmem allocator for all nodes. This is called
  * early during the architecture specific initialisation.
  */
@@ -254,7 +300,25 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 		 */
 		init_bootmem_node_bs(NODE_DATA_BS(node), map_pg,
 							np->start, np->end);
+		free_bootmem_node_bank_bs(node, mi);
+		map_pg += np->bootmap_pages;
+
+		/*
+		 * If this is node 0, we need to reserve some areas ASAP -
+		 * we may use bootmem on node 0 to setup the other nodes.
+		 */
+		if (node == 0)
+			reserve_node_zero_bs(bootmap_pfn, bootmap_pages);
 	}
+
+	if (phys_initrd_size_bs && initrd_node >= 0) {
+		reserve_bootmem_node_bs(NODE_DATA_BS(initrd_node),
+				phys_initrd_start_bs, phys_initrd_size_bs);
+		initrd_start_bs = __phys_to_virt_bs(phys_initrd_start_bs);
+		initrd_end_bs = initrd_start_bs + phys_initrd_size_bs;
+	}
+
+	BUG_ON(map_pg != bootmap_pfn + bootmap_pages);
 }
 
 /*
