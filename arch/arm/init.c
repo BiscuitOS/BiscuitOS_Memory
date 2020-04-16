@@ -17,6 +17,7 @@
 #include "asm-generated/setup.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
+#include "asm-generated/map.h"
 
 /* BiscuitOS Emulate */
 extern unsigned long _stext_bs;
@@ -344,4 +345,9 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 	 * allocate the zero page. Note that we count on this going ok.
 	 */
 	zero_page = alloc_bootmem_low_pages_bs(PAGE_SIZE);
+
+	/*
+	 * initialise the page tables.
+	 */
+	memtable_init_bs(mi);
 }

@@ -16,6 +16,7 @@
 #include "asm-generated/setup.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
+#include "asm-generated/system.h"
 
 extern void paging_init_bs(struct meminfo *, struct machine_desc *desc);
 static void __init early_end_bs(char **p);
@@ -25,6 +26,7 @@ static struct meminfo meminfo_bs = { 0, };
 static char command_line_bs[COMMAND_LINE_SIZE];
 static char default_command_line_bs[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE_BS;
 
+unsigned int processor_id_bs;
 
 /*
  * Pick out the memory size. We look for mem=size@start,
@@ -110,3 +112,20 @@ void __init setup_arch_bs(char **cmdline_p)
 	paging_init_bs(&meminfo_bs, mdesc);
 }
 
+int cpu_architecture_bs(void)
+{
+	int cpu_arch;
+
+	if ((processor_id_bs & 0x0000f000) == 0) {
+		cpu_arch = CPU_ARCH_UNKNOWN;
+	} else if ((processor_id_bs & 0x0000f000) == 0x00007000) {
+		cpu_arch = (processor_id_bs & (1 << 23)) ? 
+				CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+	} else {
+		cpu_arch = (processor_id_bs >> 16) & 7;
+		if (cpu_arch)
+			cpu_arch += CPU_ARCH_ARMv3;
+	}
+
+	return cpu_arch;
+}
