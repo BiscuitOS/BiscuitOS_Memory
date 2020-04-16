@@ -26,12 +26,6 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)
 
 ## CFlags
 ccflags-y		+= -DCONFIG_NODES_SHIFT=2
-# PAGE_OFFSET
-ccflags-y		+= -DCONFIG_PAGE_OFFSET_BS=0x90000000
-# PHYS_OFFSET
-ccflags-y		+= -DCONFIG_PHYS_OFFSET_BS=0x70000000
-# CMDLINE
-ccflags-y		+= -DCONFIG_CMDLINE_BS="\"mem_bs=0x4000000@0x70000000\""
 
 ## Header
 ccflags-y		+= -I$(PWD)/arch/$(ARCH_MM)/include

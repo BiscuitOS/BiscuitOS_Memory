@@ -8,12 +8,15 @@
  * published by the Free Software Foundation.
  */
 #include <linux/kernel.h>
+
+#include "biscuitos/kernel.h"
 #include "biscuitos/mm.h"
+#include "biscuitos/bootmem.h"
 #include "asm-generated/map.h"
 #include "asm-generated/system.h"
-#include "asm-generated/pgtable.h"
 #include "asm-generated/map.h"
 #include "asm-generated/domain.h"
+#include "asm-generated/setup.h"
 
 #define CPOLICY_UNCACHE		0
 #define CPOLICY_BUFFERED	1
@@ -23,7 +26,7 @@
 
 static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
 static unsigned int ecc_mask_bs __initdata = 0;
-pgprot_t pgprot_kernel_bs;
+pgprot_t_bs pgprot_kernel_bs;
 EXPORT_SYMBOL_GPL(pgprot_kernel_bs);
 
 struct cachepolicy {
@@ -213,6 +216,26 @@ static void __init build_mem_type_table_bs(void)
 		ecc_mask_bs ? "en" : "dis", cp->policy);
 }
 
+static inline pmd_t_bs *pmd_off_bs(pgd_t_bs *pgd, unsigned long virt)
+{
+	return NULL;
+}
+
+static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
+{
+	return pmd_off_bs(pgd_offset_k_bs(virt), virt);
+}
+
+/*
+ * Clear any PGD mapping. On a two-level page table system,
+ * the clearnance is done by the middle-level functions (pmd)
+ * rather than the top-level (pgd) functions.
+ */
+static inline void clear_mapping_bs(unsigned long virt)
+{
+	pmd_clear_bs(pmd_off_k_bs(virt));
+}
+
 /*
  * Setup initial mappings. We use the page we allocated for zero page to
  * hold the mappings, which will get overwritten by the vectors in
@@ -225,4 +248,33 @@ void __init memtable_init_bs(struct meminfo *mi)
 	int i;
 
 	build_mem_type_table_bs();
+
+	init_maps = p = alloc_bootmem_low_pages_bs(PAGE_SIZE);
+
+	for (i = 0; i < mi->nr_banks; i++) {
+		if (mi->bank[i].size == 0)
+			continue;
+
+		p->physical	= mi->bank[i].start;
+		p->virtual	= __phys_to_virt_bs(p->physical);
+		p->length	= mi->bank[i].size;
+		p->type		= MT_MEMORY;
+		p++;
+	}
+
+	/*
+	 * Go through the initial mappings, but clear out any
+	 * pgdir entries that are not in the escription.
+	 */
+	q = init_maps;
+	do {
+		if (address < q->virtual || q == p) {
+			/* FIXME: BiscuitOS doesn't clear PGD out of RAM */
+			//clear_mapping_bs(address);
+			address += PGDIR_SIZE;
+		} else {
+			q++;
+		}
+	} while (address != 0);
+	
 }

@@ -59,6 +59,18 @@
 				 PMD_SECT_BUFFERABLE)
 
 /*
+ * PMD_SHIFT determines the size of the area a second-level page table can
+ * map PGDIR_SHIFT determines what a third-level page table entry can map
+ */
+#define PMD_SHIFT		21
+#define PGDIR_SHIFT		21
+
+#define PMD_SIZE		(1UL << PMD_SHIFT)
+#define PMD_MASK		(~(PMD_SIZE-1))
+#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+#define PGDIR_MASK		(~(PGDIR_SIZE-1))
+
+/*
  * + Level 2 descriptor (PTE)
  *   - common
  */
@@ -73,19 +85,19 @@
 /*
  * These are used to make use of C type-checking
  */
-typedef struct { unsigned long pte; } pte_t;
-typedef struct { unsigned long pmd; } pmd_t;
-typedef struct { unsigned long pgd[2]; } pgd_t;
-typedef struct { unsigned long pgprot; } pgprot_t;
+typedef struct { unsigned long pte; } pte_t_bs;
+typedef struct { unsigned long pmd; } pmd_t_bs;
+typedef struct { unsigned long pgd[2]; } pgd_t_bs;
+typedef struct { unsigned long pgprot; } pgprot_t_bs;
 
 #define pte_val_bs(x)		((x).pte)
 #define pmd_val_bs(x)		((x).pmd)
 #define pgd_val_bs(x)		((x).pgd[0])
 #define pgprot_val_bs(x)	((x).pgprot)
 
-#define __pte_bs(x)		((pte_t) { (x) } )
-#define __pmd_bs(x)		((pmd_t) { (x) } )
-#define __pgprot_bs(x)		((pgprot_t) { (x) } )
+#define __pte_bs(x)		((pte_t_bs) { (x) } )
+#define __pmd_bs(x)		((pmd_t_bs) { (x) } )
+#define __pgprot_bs(x)		((pgprot_t_bs) { (x) } )
 
 /*
  * The following macros handle the cache and bufferable bits...
@@ -94,7 +106,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 				L_PTE_CACHEABLE | L_PTE_BUFFERABLE
 #define _L_PTE_READ		L_PTE_USER | L_PTE_EXEC
 
-extern pgprot_t			pgprot_kernel_bs;
+extern pgprot_t_bs		pgprot_kernel_bs;
 
 #define PAGE_NONE		__pgprot_bs(_L_PTE_DEFAULT)
 #define PAGE_COPY		__pgprot_bs(_L_PTE_DEFAULT | _L_PTE_READ)
@@ -130,5 +142,23 @@ extern pgprot_t			pgprot_kernel_bs;
 #define __S111	PAGE_SHARED
 
 extern phys_addr_t swapper_pg_dir_bs;
+/* FIXME: How to fix these header on here? */
+#include "biscuitos/mm_types.h"
+extern struct mm_struct_bs init_mm_bs;
+
+#define pmd_clear_bs(pmdp)						\
+	do {								\
+		pmdp[0] = __pmd_bs(0);					\
+		pmdp[1] = __pmd_bs(0);					\
+	} while (0)
+
+/* to find an entry in a page-table-directory */
+#define pgd_index_bs(addr)		((addr) >> PGDIR_SHIFT)
+
+#define pgd_offset_bs(mm, addr)		((mm)->pgd+pgd_index_bs(addr))
+
+/* to find an entry in a kernel page-table-directory */
+#define pgd_offset_k_bs(addr)		pgd_offset_bs(&init_mm_bs, addr)
+
 
 #endif

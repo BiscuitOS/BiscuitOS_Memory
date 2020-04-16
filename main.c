@@ -38,8 +38,10 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
+#include <linux/mm_types.h>
 
 #include "asm-generated/setup.h"
+#include "asm-generated/pgtable.h"
 
 #define DEV_NAME "BiscuitOS"
 
@@ -47,11 +49,17 @@
 phys_addr_t BiscuitOS_ram_base;
 phys_addr_t BiscuitOS_ram_size;
 phys_addr_t swapper_pg_dir_bs;
+u32 BiscuitOS_PAGE_OFFSET;
 
 /* Untouched command line (eg. for /proc) saved by arch-specific code. */
 char saved_command_line_bs[COMMAND_LINE_SIZE];
 /* Emulate Kernel image */
 unsigned long _stext_bs, _end_bs;
+/* Command line from DTS */
+const char *cmdline_dts;
+/* init mem */
+extern struct mm_struct init_mm;
+struct mm_struct_bs init_mm_bs;
 
 /* setup */
 extern void setup_arch_bs(char **);
@@ -71,7 +79,6 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *mem;
 	const phandle *ph;
-	const char *cmdline;
 	u32 array[2];
 	int ret;
 
@@ -97,15 +104,22 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	BiscuitOS_ram_base = array[0];
 	BiscuitOS_ram_size = array[1];
 
+	/* Obtain PAGE_OFFSET information */
+	ret = of_property_read_u32(mem, "page-offset", &BiscuitOS_PAGE_OFFSET);
+	if (ret) {
+		printk("Unable to read BiscuitOS PAGE_OFFSET\n");
+		return -EINVAL;
+	}
+
 	/* Obtain bootargs/cmdline */
-	ret = of_property_read_string(np, "cmdline", &cmdline);
+	ret = of_property_read_string(np, "cmdline", &cmdline_dts);
 	if (ret < 0) {
 		printk("Unable to read cmdline from BiscuitOS\n");
 		return -EINVAL;
 	}
 
 	/* Obtain kernel image information */
-	ret = of_property_read_u32_array(np, "kernel-image", array, 2);
+	ret = of_property_read_u32_array(mem, "kernel-image", array, 2);
 	if (ret) {
 		printk("Unable to read BiscuitOS kernel image.\n");
 		return -EINVAL;
@@ -115,13 +129,16 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	swapper_pg_dir_bs = _stext_bs - 0x4000;
 
 	/* Obtain initrd information */
-	ret = of_property_read_u32_array(np, "initrd", array, 2);
+	ret = of_property_read_u32_array(mem, "initrd", array, 2);
 	if (ret) {
 		printk("Unable to read BiscuitOS initrd.\n");
 		return -EINVAL;
 	}
 	phys_initrd_start_bs = array[0];
 	phys_initrd_size_bs = array[1];
+
+	/* swapper_pg_dir and init_mm */
+	init_mm_bs.pgd = (pgd_t_bs *)init_mm.pgd;
 
 	start_kernel();
 

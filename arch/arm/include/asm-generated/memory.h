@@ -4,13 +4,15 @@
 /*
  * Physical DRAM offset.
  */
-#define PHYS_OFFSET	CONFIG_PHYS_OFFSET_BS
+extern phys_addr_t BiscuitOS_ram_base;
+#define PHYS_OFFSET	BiscuitOS_ram_base
 
 /*
  * Page offset
  */
+extern u32 BiscuitOS_PAGE_OFFSET;
 #ifndef PAGE_OFFSET
-#define PAGE_OFFSET	CONFIG_PAGE_OFFSET_BS
+#define PAGE_OFFSET	BiscuitOS_PAGE_OFFSET
 #endif
 
 #define PHYS_TO_NID(addr)	(0)

@@ -17,14 +17,20 @@
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/system.h"
+#include "asm-generated/tlbflush.h"
+
+#ifndef MEM_SIZE
+#define MEM_SIZE	(16*1024*1024)
+#endif
+
+struct cpu_tlb_fns cpu_tlb_bs;
 
 extern void paging_init_bs(struct meminfo *, struct machine_desc *desc);
-static void __init early_end_bs(char **p);
-static void __init early_begin_bs(char **p);
+extern const char *cmdline_dts;
 
 static struct meminfo meminfo_bs = { 0, };
 static char command_line_bs[COMMAND_LINE_SIZE];
-static char default_command_line_bs[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE_BS;
+static char __unused default_command_line_bs[COMMAND_LINE_SIZE] __initdata;
 
 unsigned int processor_id_bs;
 
@@ -103,7 +109,8 @@ static void __init parse_cmdline_bs(char **cmdline_p, char *from)
 void __init setup_arch_bs(char **cmdline_p)
 {
 	struct machine_desc *mdesc = NULL;
-	char *from = default_command_line_bs;
+	/* BiscuitOS doesn't emulate ATAG and KBUILD, both from DTS */
+	char *from = (char *)cmdline_dts;
 
 	memcpy(saved_command_line_bs, from, COMMAND_LINE_SIZE);
 	saved_command_line_bs[COMMAND_LINE_SIZE - 1] = '\0';

@@ -231,7 +231,6 @@ static __init void reserve_node_zero_bs(unsigned int bootmap_pfn,
 						unsigned int bootmap_pages)
 {
 	pg_data_t *pgdat = NODE_DATA_BS(0);
-	unsigned long res_size = 0;
 
 	/*
 	 * Register the kernel text and data with bootmeme.
@@ -245,7 +244,7 @@ static __init void reserve_node_zero_bs(unsigned int bootmap_pfn,
 	 * and can only be in node 0.
 	 */
 	reserve_bootmem_node_bs(pgdat, __pa_bs(swapper_pg_dir_bs),
-			PTRS_PER_PGD * sizeof(pgd_t));
+			PTRS_PER_PGD * sizeof(pgd_t_bs));
 
 	/*
 	 * And don't forget to reserve the allocator bitmap,
@@ -335,7 +334,6 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 {
 	void *zero_page;
-	int node;
 
 	bootmem_init_bs(mi);
 
