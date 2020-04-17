@@ -23,9 +23,13 @@ ARCH_MM			:= arm
 $(MODULE_NAME)-m	:= main.o
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/mm/*.c))
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.c)) 
+$(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.S)) 
 
 ## CFlags
 ccflags-y		+= -DCONFIG_NODES_SHIFT=2
+## ASFlags
+asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
+asflags-y		+= -I$(PWD)/include
 
 ## Header
 ccflags-y		+= -I$(PWD)/arch/$(ARCH_MM)/include

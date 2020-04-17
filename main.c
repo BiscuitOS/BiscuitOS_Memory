@@ -39,6 +39,7 @@
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/mm_types.h>
+#include <asm/tlbflush.h>
 
 #include "asm-generated/setup.h"
 #include "asm-generated/pgtable.h"
@@ -60,6 +61,8 @@ const char *cmdline_dts;
 /* init mem */
 extern struct mm_struct init_mm;
 struct mm_struct_bs init_mm_bs;
+/* FIXME: TLB information: From ARMv7 Hard-Code */
+unsigned long BiscuitOS_tlb_flags = 0xd0091010;
 
 /* setup */
 extern void setup_arch_bs(char **);
@@ -104,10 +107,10 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	BiscuitOS_ram_base = array[0];
 	BiscuitOS_ram_size = array[1];
 
-	/* Obtain PAGE_OFFSET information */
+	/* Obtain PAGE_OFFSET_BS information */
 	ret = of_property_read_u32(mem, "page-offset", &BiscuitOS_PAGE_OFFSET);
 	if (ret) {
-		printk("Unable to read BiscuitOS PAGE_OFFSET\n");
+		printk("Unable to read BiscuitOS PAGE_OFFSET_BS\n");
 		return -EINVAL;
 	}
 
