@@ -1,18 +1,27 @@
 #ifndef _BISCUITOS_ARM_MEMORY_H
 #define _BISCUITOS_ARM_MEMORY_H
 
+#ifndef TASK_SIZE_BS
+/*
+ * TASK_SIZE_BS - the maximum size of a user space task.
+ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+ */
+#define TASK_SIZE_BS		(0x7f000000UL)
+#define TASK_UNMAPPED_BASE_BS	(0x40000000UL)
+#endif
+
 /*
  * Physical DRAM offset.
  */
 extern phys_addr_t BiscuitOS_ram_base;
-#define PHYS_OFFSET	BiscuitOS_ram_base
+#define PHYS_OFFSET_BS	BiscuitOS_ram_base
 
 /*
  * Page offset
  */
 extern u32 BiscuitOS_PAGE_OFFSET;
-#ifndef PAGE_OFFSET
-#define PAGE_OFFSET	BiscuitOS_PAGE_OFFSET
+#ifndef PAGE_OFFSET_BS
+#define PAGE_OFFSET_BS	BiscuitOS_PAGE_OFFSET
 #endif
 
 #define PHYS_TO_NID(addr)	(0)
@@ -23,8 +32,8 @@ extern u32 BiscuitOS_PAGE_OFFSET;
  * files. Use virt_to_phys/phys_to_virt/__pa/__va instead.
  */
 #ifndef _virt_to_phys
-#define __virt_to_phys_bs(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
-#define __phys_to_virt_bs(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+#define __virt_to_phys_bs(x)	((x) - PAGE_OFFSET_BS + PHYS_OFFSET_BS)
+#define __phys_to_virt_bs(x)	((x) - PHYS_OFFSET_BS + PAGE_OFFSET_BS)
 #endif
 
 /*

@@ -17,6 +17,9 @@
 #include "asm-generated/map.h"
 #include "asm-generated/domain.h"
 #include "asm-generated/setup.h"
+#include "asm-generated/vmalloc.h"
+#include "asm-generated/tlbflush.h"
+#include "asm-generated/cacheflush.h"
 
 #define CPOLICY_UNCACHE		0
 #define CPOLICY_BUFFERED	1
@@ -28,6 +31,8 @@ static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
 static unsigned int ecc_mask_bs __initdata = 0;
 pgprot_t_bs pgprot_kernel_bs;
 EXPORT_SYMBOL_GPL(pgprot_kernel_bs);
+
+pmd_t_bs *top_pmd_bs;
 
 struct cachepolicy {
 	const char	policy[16];
@@ -218,12 +223,43 @@ static void __init build_mem_type_table_bs(void)
 
 static inline pmd_t_bs *pmd_off_bs(pgd_t_bs *pgd, unsigned long virt)
 {
-	return NULL;
+	return pmd_offset_bs(pgd, virt);
 }
 
 static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
 {
 	return pmd_off_bs(pgd_offset_k_bs(virt), virt);
+}
+
+/*
+ * Add a PAGE mapping between VIRT and PHYS in domain
+ * DOMIAN with protection PROT. Note that due to the
+ * way we map the PTEs, we must allocated two PTE_SIZE'd
+ * blocks - one for the Linux pte table, and one for
+ * the hardware pte table.
+ */
+static inline void
+alloc_init_page_bs(unsigned long virt, unsigned long phys, 
+				unsigned int prot_l1, pgprot_t_bs prot)
+{
+	pmd_t_bs *pmdp = pmd_off_k_bs(virt);
+	pte_t_bs *ptep;
+
+	if (pmd_none_bs(*pmdp)) {
+		unsigned long pmdval;
+		ptep = alloc_bootmem_low_pages_bs(2 * PTRS_PER_PTE *
+						sizeof(pte_t_bs));
+
+		pmdval = __pa_bs(ptep) | prot_l1;
+		pmdp[0] = __pmd_bs(pmdval);
+		pmdp[1] = __pmd_bs(pmdval + 256 * sizeof(pte_t_bs));
+		/* FIXME: Use ARMv7 */
+		flush_pmd_entry_bs(pmdp);
+	}
+	ptep = pte_offset_kernel_bs(pmdp, virt);
+
+	/* FIXME: Use ARMv7 */
+	set_pte_bs(ptep, pfn_pte_bs(phys >> PAGE_SHIFT, prot));
 }
 
 /*
@@ -234,6 +270,123 @@ static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
 static inline void clear_mapping_bs(unsigned long virt)
 {
 	pmd_clear_bs(pmd_off_k_bs(virt));
+}
+
+/*
+ * Create a SECTION PGD between VIRT and PHYS in domain
+ * DOMAIN with protection PROT. This operates on half-pgdir
+ # entry increments.
+ */
+static inline void
+alloc_init_section_bs(unsigned long virt, unsigned long phys, int prot)
+{
+	pmd_t_bs *pmdp = pmd_off_k_bs(virt);
+
+	if (virt & (1 << 20))
+		pmdp++;
+
+	*pmdp = __pmd_bs(phys | prot);
+	flush_pmd_entry_bs(pmdp);
+}
+
+#define vectors_base_bs()	(vectors_high_bs() ? 0xffff0000 : 0)
+
+/*
+ * Create the page directory entries and any necessary
+ * page tables for the mapping specified by 'md'. We
+ * are able to cope here with varying sizes and address
+ * offsets, and we take full advantage of sections and
+ * supersections.
+ */
+static void __init create_mapping_bs(struct map_desc *md)
+{
+	unsigned long virt, length;
+	int prot_sect, prot_l1, domain;
+	pgprot_t_bs prot_pte;
+	long off;
+
+	if (md->virtual != vectors_base_bs() && md->virtual < TASK_SIZE_BS) {
+		printk(KERN_WARNING "BUG: not create mapping for "
+			"%#lx at %#lx in user region\n",
+			md->physical, md->virtual);
+		return;
+	}
+
+	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+	     md->virtual >= PAGE_OFFSET_BS && md->virtual < VMALLOC_END) {
+		printk(KERN_WARNING "BUG: mapping for %#lx at %#lx "
+			"overlaps vmalloc space\n",
+			md->physical, md->virtual);
+	}
+
+	domain    = mem_types_bs[md->type].domain;
+	prot_pte  = __pgprot_bs(mem_types_bs[md->type].prot_pte);
+	prot_l1   = mem_types_bs[md->type].prot_l1 | PMD_DOMAIN(domain);
+	prot_sect = mem_types_bs[md->type].prot_sect | PMD_DOMAIN(domain);
+
+	virt      = md->virtual;
+	off       = md->physical - virt;
+	length    = md->length;	
+
+	if (mem_types_bs[md->type].prot_l1 == 0 &&
+		(virt & 0xfffff || (virt + off) & 0xfffff || 
+		(virt + length) & 0xfffff)) {
+		printk(KERN_WARNING "BUG: map for %#lx at %#lx can not "
+			"be mapped using pages, ignoring.\n",
+			md->physical, md->virtual);
+		return;
+	}
+
+	while ((virt & 0xfffff || (virt + off) & 0xfffff) && 
+						length >= PAGE_SIZE) {
+		alloc_init_page_bs(virt, virt + off, prot_l1, prot_pte);
+
+		virt   += PAGE_SIZE;
+		length -= PAGE_SIZE;
+	}
+
+	/*
+	 * N.B. ARMv6 supersections are only defined to work with domain 0.
+	 *      Since domain assignments can in fact be arbitrary, the
+	 *      'domain == 0' check below is required to insure that ARMv6
+	 *      supersections are only allocated for domain 0 regardless
+	 *      of the actual domain assignment in use.
+	 */
+	if (cpu_architecture_bs() >= CPU_ARCH_ARMv6 && domain == 0) {
+		/* Align to supersection boundary */
+		while ((virt & ~SUPERSECTION_MASK || (virt + off) &
+			~SUPERSECTION_MASK) && length >= (PGDIR_SIZE / 2)) {
+			alloc_init_section_bs(virt, virt + off, prot_sect);
+
+			virt   += (PGDIR_SIZE / 2);
+			length -= (PGDIR_SIZE / 2);
+		}
+
+		while (length >= SUPERSECTION_SIZE) {
+			BS_DUP();
+
+			virt   += SUPERSECTION_SIZE;
+			length += SUPERSECTION_SIZE;
+		}
+	}
+
+	return;
+	/*
+	 * A section mapping cover half a "pgdir" entry.
+	 */
+	while (length >= (PGDIR_SIZE / 2)) {
+		alloc_init_section_bs(virt, virt + off, prot_sect);
+
+		virt   += (PGDIR_SIZE / 2);
+		length -= (PGDIR_SIZE / 2);
+	}
+
+	while (length >= PAGE_SIZE) {
+		alloc_init_page_bs(virt, virt + off, prot_l1, prot_pte);
+
+		virt   += PAGE_SIZE;
+		length -= PAGE_SIZE;
+	}
 }
 
 /*
@@ -273,8 +426,33 @@ void __init memtable_init_bs(struct meminfo *mi)
 			//clear_mapping_bs(address);
 			address += PGDIR_SIZE;
 		} else {
+			create_mapping_bs(q);
+
+			address = q->virtual + q->length;
+			address = (address + PGDIR_SIZE - 1) & PGDIR_MASK;
 			q++;
 		}
 	} while (address != 0);
+
+	/*
+	 * Create a mapping for the machine vectors at the high-vectors
+	 * location (0xffff0000). If we aren't using high-vectors, also
+	 * create a mapping at the low-vectors virtual address.
+	 */
+	init_maps->physical   = virt_to_phys_bs(init_maps);
+	init_maps->virtual    = 0xffff0000;
+	init_maps->length     = PAGE_SIZE;
+	init_maps->type       = MT_HIGH_VECTORS;
+	create_mapping_bs(init_maps);
+
+	if (!vectors_high_bs()) {
+		init_maps->virtual = 0;
+		init_maps->type = MT_LOW_VECTORS;
+		create_mapping_bs(init_maps);
+	}
+
+	flush_cache_all_bs();
+	flush_tlb_all_bs();
 	
+	top_pmd_bs = pmd_off_k_bs(0xffff0000);
 }

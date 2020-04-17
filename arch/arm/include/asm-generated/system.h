@@ -10,6 +10,7 @@
 #define CPU_ARCH_ARMv5TE	6
 #define CPU_ARCH_ARMv5TEJ	7 
 #define CPU_ARCH_ARMv6		8
+#define CPU_ARCH_ARMv7		9
 
 /*
  * CR1 bits (CP#15 CR1)
@@ -46,6 +47,8 @@
 	: "=r" (__val) :: "cc");				\
 	__val;							\
 })
+
+#define vectors_high_bs()		(0)
 
 extern int cpu_architecture_bs(void);
 

@@ -18,6 +18,7 @@
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/map.h"
+#include "asm-generated/tlbflush.h"
 
 /* BiscuitOS Emulate */
 extern unsigned long _stext_bs;
@@ -124,8 +125,8 @@ find_memend_and_nodes_bs(struct meminfo *mi, struct node_info *np)
 	 * Note: max_low_pfn and max_pfn reflect the number
 	 * of _pages_in the system, not the maximum PFN.
 	 */
-	max_low_pfn_bs = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
-	max_pfn_bs = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
+	max_low_pfn_bs = memend_pfn - O_PFN_DOWN(PHYS_OFFSET_BS);
+	max_pfn_bs = memend_pfn - O_PFN_DOWN(PHYS_OFFSET_BS);
 
 	return bootmem_pages;
 }
@@ -348,4 +349,8 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 	 * initialise the page tables.
 	 */
 	memtable_init_bs(mi);
+	if (mdesc->map_io)
+		mdesc->map_io();
+
+	flush_tlb_all_bs();
 }

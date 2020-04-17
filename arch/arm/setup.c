@@ -18,14 +18,19 @@
 #include "asm-generated/memory.h"
 #include "asm-generated/system.h"
 #include "asm-generated/tlbflush.h"
+#include "asm-generated/cputype.h"
+#include "asm-generated/procinfo.h"
 
 #ifndef MEM_SIZE
 #define MEM_SIZE	(16*1024*1024)
 #endif
 
-struct cpu_tlb_fns cpu_tlb_bs;
-
 extern void paging_init_bs(struct meminfo *, struct machine_desc *desc);
+/*
+ * These functions re-use the assembly code in head.S, which
+ * already provide the required functionality.
+ */
+extern struct proc_info_list *lookup_processor_type_bs(unsigned int);
 extern const char *cmdline_dts;
 
 static struct meminfo meminfo_bs = { 0, };
@@ -33,6 +38,13 @@ static char command_line_bs[COMMAND_LINE_SIZE];
 static char __unused default_command_line_bs[COMMAND_LINE_SIZE] __initdata;
 
 unsigned int processor_id_bs;
+
+/*
+ * Cached cpu_architecture() result for use by assembler code.
+ * C code should use the cpu_architecture() function instead of accessing this
+ * variable directly.
+ */
+int __cpu_architecture_bs __read_mostly = CPU_ARCH_UNKNOWN;
 
 /*
  * Pick out the memory size. We look for mem=size@start,
@@ -53,7 +65,7 @@ static void early_param_0(char **p)
 		meminfo_bs.nr_banks = 0;
 	}
 
-	start = PHYS_OFFSET;
+	start = PHYS_OFFSET_BS;
 	size = memparse(*p, p);
 	if (**p == '@')
 		start = memparse(*p + 1, p);
@@ -106,11 +118,64 @@ static void __init parse_cmdline_bs(char **cmdline_p, char *from)
 	*cmdline_p = command_line_bs;
 }
 
+static int __get_cpu_architecture_bs(void)
+{
+	int cpu_arch;
+
+	if ((read_cpuid_id_bs() & 0x0008f000) == 0) {
+		cpu_arch = CPU_ARCH_UNKNOWN;
+	} else if ((read_cpuid_id_bs() & 0x0008f0000) == 0x00007000) {
+		cpu_arch = (read_cpuid_id_bs() & (1 << 23)) ? 
+					CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+	} else if ((read_cpuid_id_bs() && 0x00080000) == 0x00000000) {
+		cpu_arch = (read_cpuid_id_bs() >> 16) & 7;
+		if (cpu_arch)
+			cpu_arch += CPU_ARCH_ARMv3;
+	} else if ((read_cpuid_id_bs() & 0x000f0000) == 0x000f0000) {
+		/* Revised CPUID format. Read the Memory Model Feature
+		 * Register 0 and check for VMSAv7 or PMSAv7 */
+		unsigned int mmfr0 = read_cpuid_ext_bs(CPUID_EXT_MMFR0);
+
+		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
+		    (mmfr0 & 0x000000f0) >= 0x00000030)
+			cpu_arch = CPU_ARCH_ARMv7;
+		else if ((mmfr0 & 0x0000000f) == 0x00000002 ||
+			 (mmfr0 & 0x000000f0) == 0x00000020)
+			cpu_arch = CPU_ARCH_ARMv6;
+		else
+			cpu_arch = CPU_ARCH_UNKNOWN;
+	} else
+		cpu_arch = CPU_ARCH_UNKNOWN;
+
+	return cpu_arch;
+}
+
+/*
+ * locate processor in the list of supported processor types. The linker
+ * builds this table for use for the entries in arch/arm/mm/proc-*.S
+ */
+struct proc_info_list *lookup_processor_bs(u32 midr)
+{
+	return NULL;
+}
+
+static void __init setup_processor_bs(void)
+{
+	unsigned int midr = read_cpuid_id_bs();
+	struct proc_info_list *list = lookup_processor_bs(midr);
+
+	__cpu_architecture_bs = __get_cpu_architecture_bs();
+	printk("ARCH %d\n", __cpu_architecture_bs);
+	
+}
+
 void __init setup_arch_bs(char **cmdline_p)
 {
 	struct machine_desc *mdesc = NULL;
 	/* BiscuitOS doesn't emulate ATAG and KBUILD, both from DTS */
 	char *from = (char *)cmdline_dts;
+
+	setup_processor_bs();
 
 	memcpy(saved_command_line_bs, from, COMMAND_LINE_SIZE);
 	saved_command_line_bs[COMMAND_LINE_SIZE - 1] = '\0';
