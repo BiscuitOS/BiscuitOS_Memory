@@ -51,6 +51,11 @@ phys_addr_t BiscuitOS_ram_base;
 phys_addr_t BiscuitOS_ram_size;
 phys_addr_t swapper_pg_dir_bs;
 u32 BiscuitOS_PAGE_OFFSET;
+u32 BiscuitOS_high_memory;
+u32 BiscuitOS_low_memory;
+u32 BiscuitOS_vmalloc_size;
+u32 BiscuitOS_pkmap_size;
+u32 BiscuitOS_fixmap_size;
 
 /* Untouched command line (eg. for /proc) saved by arch-specific code. */
 char saved_command_line_bs[COMMAND_LINE_SIZE];
@@ -68,6 +73,7 @@ unsigned long BiscuitOS_tlb_flags = 0xd0091010;
 extern void setup_arch_bs(char **);
 extern unsigned long phys_initrd_start_bs;
 extern unsigned long phys_initrd_size_bs;
+extern void *high_memory_bs;
 
 /* BiscuitOS architecture */
 static void start_kernel(void)
@@ -83,6 +89,7 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	struct device_node *mem;
 	const phandle *ph;
 	u32 array[2];
+	u32 data;
 	int ret;
 
 	/* Find memory node by phandle */
@@ -111,6 +118,42 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(mem, "page-offset", &BiscuitOS_PAGE_OFFSET);
 	if (ret) {
 		printk("Unable to read BiscuitOS PAGE_OFFSET_BS\n");
+		return -EINVAL;
+	}
+
+	/* Obtain normal-zone information */
+	ret = of_property_read_u32(mem, "normal-zone", &BiscuitOS_low_memory);
+	if (ret) {
+		printk("Unable to read BiscuitOS normal-zone\n");
+		return -EINVAL;
+	}
+
+	/* Obtain high-zone information */
+	ret = of_property_read_u32(mem, "high-zone", &BiscuitOS_high_memory);
+	if (ret) {
+		printk("Unable to read BiscuitOS high-zone\n");
+		return -EINVAL;
+	}
+
+	/* Obtain vmalloc-size information */
+	ret = of_property_read_u32(mem, "vmalloc-size", 
+						&BiscuitOS_vmalloc_size);
+	if (ret) {
+		printk("Unable to read BiscuitOS vmalloc-size\n");
+		return -EINVAL;
+	}
+
+	/* Obtain pkmap-size information */
+	ret = of_property_read_u32(mem, "pkmap-size", &BiscuitOS_pkmap_size);
+	if (ret) {
+		printk("Unable to read BiscuitOS pkmap-size\n");
+		return -EINVAL;
+	}
+
+	/* Obtain fixmap-size information */
+	ret = of_property_read_u32(mem, "fixmap-size", &BiscuitOS_fixmap_size);
+	if (ret) {
+		printk("Unable to read BiscuitOS fixmap-size\n");
 		return -EINVAL;
 	}
 

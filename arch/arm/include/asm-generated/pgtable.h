@@ -13,6 +13,41 @@
 #include "asm-generated/memory.h"
 #endif
 
+#ifdef __ASSEMBLY__
+#define _AC(X,Y)	X
+#define _AT(T,X)	X
+#else
+#define __AC(X,Y)	(X##Y)
+#define _AC(X,Y)	__AC(X,Y)
+#define _AT(T,X)	((T)(X))
+#endif
+
+#ifndef __ASSEMBLY__
+
+/*
+ * These are used to make use of C type-checking
+ */
+typedef struct { unsigned long pte; } pte_t_bs;
+typedef struct { unsigned long pmd; } pmd_t_bs;
+typedef struct { unsigned long pgd[2]; } pgd_t_bs;
+typedef struct { unsigned long pgprot; } pgprot_t_bs;
+
+typedef u32 pteval_t_bs;
+typedef u32 pmdval_t_bs;
+
+typedef struct { pgd_t_bs pgd; } pud_t_bs;
+
+#define pte_val_bs(x)		((x).pte)
+#define pmd_val_bs(x)		((x).pmd)
+#define pgd_val_bs(x)		((x).pgd[0])
+#define pgprot_val_bs(x)	((x).pgprot)
+
+#define __pte_bs(x)		((pte_t_bs) { (x) } )
+#define __pmd_bs(x)		((pmd_t_bs) { (x) } )
+#define __pgprot_bs(x)		((pgprot_t_bs) { (x) } )
+
+#endif
+
 /*
  * Hardware-wise, we have a two level page table structure, where the first
  * level has 4096 entries, and the second level has 256 entries.  Each entry
@@ -75,6 +110,34 @@
 #define PTRS_PER_PMD		1
 #define PTRS_PER_PGD		2048
 
+#define PTE_HWTABLE_PTRS	(PTRS_PER_PTE)
+#define PTE_HWTABLE_OFF		(PTE_HWTABLE_PTRS * sizeof(pte_t))
+#define PTE_HWTABLE_SIZE	(PTRS_PER_PTE * sizeof(u32))
+
+/*
+ * PMD_SHIFT determines the size of the area a second-level page table can map
+ * PGDIR_SHIFT determines what a third-level page table entry can map
+ */
+#define PMD_SHIFT		21
+#define PGDIR_SHIFT		21
+
+#define PMD_SIZE		(1UL << PMD_SHIFT)
+#define PMD_MASK		(~(PMD_SIZE-1))
+#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+#define PGDIR_MASK		(~(PGDIR_SIZE-1))
+
+#define PUD_SHIFT		PGDIR_SHIFT
+#define PTRS_PER_PUD		1
+#define PUD_SIZE		(1UL << PUD_SHIFT)
+#define PUD_MASK		(~(PUD_SIZE-1))
+
+/*
+ * section address mask and size definitions.
+ */
+#define SECTION_SHIFT		20
+#define SECTION_SIZE		(1UL << SECTION_SHIFT)
+#define SECTION_MASK		(~(SECTION_SIZE-1))
+
 /*
  * "Linux" PTE definitions.
  *
@@ -86,19 +149,69 @@
  * The PTE table pointer refers to the hardware entries; the "Linux"
  * entries are stored 1024 bytes below.
  */
-#define L_PTE_VALID		(1 << 0)
-#define L_PTE_PRESENT		(1 << 0)
-#define L_PTE_FILE		(1 << 1)	/* only when !PRESENT */
-#define L_PTE_YOUNG		(1 << 1)
-#define L_PTE_BUFFERABLE	(1 << 2)	/* matches PTE */
-#define L_PTE_CACHEABLE		(1 << 3)	/* matches PTE */
-#define L_PTE_USER		(1 << 8)
-#define L_PTE_WRITE		(1 << 5)
-#define L_PTE_EXEC		(1 << 6)
-#define L_PTE_DIRTY		(1 << 6)
-#define L_PTE_RDONLY		(1 << 7)
-#define L_PTE_XN		(1 << 9)
-#define L_PTE_NONE		(1 << 11)
+#define L_PTE_VALID		(_AT(pteval_t_bs, 1) << 0)         /* Valid */
+#define L_PTE_PRESENT		(_AT(pteval_t_bs, 1) << 0)
+#define L_PTE_YOUNG		(_AT(pteval_t_bs, 1) << 1)
+#define L_PTE_DIRTY		(_AT(pteval_t_bs, 1) << 6)
+#define L_PTE_RDONLY		(_AT(pteval_t_bs, 1) << 7)
+#define L_PTE_USER		(_AT(pteval_t_bs, 1) << 8)
+#define L_PTE_XN		(_AT(pteval_t_bs, 1) << 9)
+#define L_PTE_SHARED		(_AT(pteval_t_bs, 1) << 10)        /* shared(v6), coherent(xsc3) */
+#define L_PTE_NONE		(_AT(pteval_t_bs, 1) << 11)
+
+/*
+ * These are the memory types, defined to be compatible with
+ * pre-ARMv6 CPUs cacheable and bufferable bits: n/a,n/a,C,B
+ * ARMv6+ without TEX remapping, they are a table index.
+ * ARMv6+ with TEX remapping, they correspond to n/a,TEX(0),C,B
+ *
+ * MT type              Pre-ARMv6       ARMv6+ type / cacheable status
+ * UNCACHED             Uncached        Strongly ordered
+ * BUFFERABLE           Bufferable      Normal memory / non-cacheable
+ * WRITETHROUGH         Writethrough    Normal memory / write through
+ * WRITEBACK            Writeback       Normal memory / write back, read alloc
+ * MINICACHE            Minicache       N/A
+ * WRITEALLOC           Writeback       Normal memory / write back, write alloc
+ * DEV_SHARED           Uncached        Device memory (shared)
+ * DEV_NONSHARED        Uncached        Device memory (non-shared) 
+ * DEV_WC               Bufferable      Normal memory / non-cacheable
+ * DEV_CACHED           Writeback       Normal memory / write back, read alloc
+ * VECTORS              Variable        Normal memory / variable
+ *
+ * All normal memory mappings have the following properties:
+ * - reads can be repeated with no side effects
+ * - repeated reads return the last value written
+ * - reads can fetch additional locations without side effects
+ * - writes can be repeated (in certain cases) with no side effects
+ * - writes can be merged before accessing the target
+ * - unaligned accesses can be supported
+ *
+ * All device mappings have the following properties:
+ * - no access speculation
+ * - no repetition (eg, on return from an exception)
+ * - number, order and size of accesses are maintained
+ * - unaligned accesses are "unpredictable"
+ */
+#define L_PTE_MT_UNCACHED	(_AT(pteval_t_bs, 0x00) << 2)      /* 0000 */
+#define L_PTE_MT_BUFFERABLE	(_AT(pteval_t_bs, 0x01) << 2)      /* 0001 */
+#define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t_bs, 0x02) << 2)      /* 0010 */
+#define L_PTE_MT_WRITEBACK	(_AT(pteval_t_bs, 0x03) << 2)      /* 0011 */
+#define L_PTE_MT_MINICACHE	(_AT(pteval_t_bs, 0x06) << 2)      /* 0110 (sa1100, xscale) */
+#define L_PTE_MT_WRITEALLOC	(_AT(pteval_t_bs, 0x07) << 2)      /* 0111 */
+#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t_bs, 0x04) << 2)      /* 0100 */
+#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t_bs, 0x0c) << 2)      /* 1100 */
+#define L_PTE_MT_DEV_WC		(_AT(pteval_t_bs, 0x09) << 2)      /* 1001 */
+#define L_PTE_MT_DEV_CACHED	(_AT(pteval_t_bs, 0x0b) << 2)      /* 1011 */
+#define L_PTE_MT_VECTORS	(_AT(pteval_t_bs, 0x0f) << 2)      /* 1111 */
+#define L_PTE_MT_MASK		(_AT(pteval_t_bs, 0x0f) << 2)
+
+/*
+ * The pgprot_* and protection_map entries will be fixed up in runtime
+ * to include the cachable and bufferable bits based on memory policy,
+ * as well as any architecture dependent bits like global/ASID and SMP
+ * shared mapping bits.
+ */
+#define _L_PTE_DEFAULT		L_PTE_PRESENT | L_PTE_YOUNG
 
 /*
  * ARMv6 supersection address mask and size definitions.
@@ -113,105 +226,103 @@
  * + Level 1 descriptor (PMD)
  *   - common
  */
-#define PMD_TYPE_MASK		(3 << 0)
-#define PMD_TYPE_FAULT		(0 << 0)
-#define PMD_TYPE_TABLE		(1 << 0)
-#define PMD_TYPE_SECT		(2 << 0)
-#define PMD_BIT4		(1 << 4)
-#define PMD_DOMAIN(x)		((x) << 5)
-#define PMD_PROTECTION		(1 << 9)	/* v5 */
+#define PMD_TYPE_MASK		(_AT(pmdval_t_bs, 3) << 0)
+#define PMD_TYPE_FAULT		(_AT(pmdval_t_bs, 0) << 0)
+#define PMD_TYPE_TABLE		(_AT(pmdval_t_bs, 1) << 0)
+#define PMD_TYPE_SECT		(_AT(pmdval_t_bs, 2) << 0)
+#define PMD_PXNTABLE		(_AT(pmdval_t_bs, 1) << 2)     /* v7 */
+#define PMD_BIT4		(_AT(pmdval_t_bs, 1) << 4)
+#define PMD_DOMAIN(x)		(_AT(pmdval_t_bs, (x)) << 5)
+#define PMD_DOMAIN_MASK		PMD_DOMAIN(0x0f)
+#define PMD_PROTECTION		(_AT(pmdval_t_bs, 1) << 9)         /* v5 */
 /*
  *   - section
  */
-#define PMD_SECT_BUFFERABLE	(1 << 2)
-#define PMD_SECT_CACHEABLE	(1 << 3)
-#define PMD_SECT_AP_WRITE	(1 << 10)
-#define PMD_SECT_AP_READ	(1 << 11)
-#define PMD_SECT_TEX(x)		((x) << 12)	/* v5 */
-#define PMD_SECT_APX		(1 << 15)	/* v6 */
-#define PMD_SECT_S		(1 << 16)	/* v6 */
-#define PMD_SECT_nG		(1 << 17)	/* v6 */
-#define PMD_SECT_SUPER		(1 << 18)	/* v6 */
+#define PMD_SECT_PXN		(_AT(pmdval_t_bs, 1) << 0)     /* v7 */
+#define PMD_SECT_BUFFERABLE	(_AT(pmdval_t_bs, 1) << 2)
+#define PMD_SECT_CACHEABLE	(_AT(pmdval_t_bs, 1) << 3)
+#define PMD_SECT_XN		(_AT(pmdval_t_bs, 1) << 4)         /* v6 */
+#define PMD_SECT_AP_WRITE	(_AT(pmdval_t_bs, 1) << 10)
+#define PMD_SECT_AP_READ	(_AT(pmdval_t_bs, 1) << 11)
+#define PMD_SECT_TEX(x)		(_AT(pmdval_t_bs, (x)) << 12)      /* v5 */
+#define PMD_SECT_APX		(_AT(pmdval_t_bs, 1) << 15)        /* v6 */
+#define PMD_SECT_S		(_AT(pmdval_t_bs, 1) << 16)        /* v6 */
+#define PMD_SECT_nG		(_AT(pmdval_t_bs, 1) << 17)        /* v6 */
+#define PMD_SECT_SUPER		(_AT(pmdval_t_bs, 1) << 18)        /* v6 */
+#define PMD_SECT_AF		(_AT(pmdval_t_bs, 0))
 
-#define PMD_SECT_UNCACHED	(0)
+#define PMD_SECT_UNCACHED	(_AT(pmdval_t_bs, 0))
 #define PMD_SECT_BUFFERED	(PMD_SECT_BUFFERABLE)
 #define PMD_SECT_WT		(PMD_SECT_CACHEABLE)
 #define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
 #define PMD_SECT_MINICACHE	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE)
 #define PMD_SECT_WBWA		(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | \
-				 PMD_SECT_BUFFERABLE)
+				PMD_SECT_BUFFERABLE)
+#define PMD_SECT_CACHE_MASK	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | \
+				PMD_SECT_BUFFERABLE)
+#define PMD_SECT_NONSHARED_DEV	(PMD_SECT_TEX(2))
 
 /*
- * PMD_SHIFT determines the size of the area a second-level page table can
- * map PGDIR_SHIFT determines what a third-level page table entry can map
+ *   - coarse table (not used)
  */
-#define PMD_SHIFT		21
-#define PGDIR_SHIFT		21
-
-#define PMD_SIZE		(1UL << PMD_SHIFT)
-#define PMD_MASK		(~(PMD_SIZE-1))
-#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
 
 /*
  * + Level 2 descriptor (PTE)
  *   - common
  */
-#define PTE_TYPE_MASK		(3 << 0)
-#define PTE_TYPE_FAULT		(0 << 0)
-#define PTE_TYPE_LARGE		(1 << 0)
-#define PTE_TYPE_SMALL		(2 << 0)
-#define PTE_TYPE_EXT		(3 << 0)	/* v5 */
-#define PTE_BUFFERABLE		(1 << 2)
-#define PTE_CACHEABLE		(1 << 3)
+#define PTE_TYPE_MASK		(_AT(pteval_t_bs, 3) << 0)
+#define PTE_TYPE_FAULT		(_AT(pteval_t_bs, 0) << 0)
+#define PTE_TYPE_LARGE		(_AT(pteval_t_bs, 1) << 0)
+#define PTE_TYPE_SMALL		(_AT(pteval_t_bs, 2) << 0)
+#define PTE_TYPE_EXT		(_AT(pteval_t_bs, 3) << 0)         /* v5 */
+#define PTE_BUFFERABLE		(_AT(pteval_t_bs, 1) << 2)
+#define PTE_CACHEABLE		(_AT(pteval_t_bs, 1) << 3)
 
 /*
- * - extended small page/tiny page
+ *   - extended small page/tiny page
  */
-#define PTE_EXT_XN		(1 << 0)
-#define PTE_EXT_AP0		(1 << 4)
-#define PTE_EXT_AP1		(2 << 4)
-#define PTE_EXT_TEX(x)		((x) << 6)
-#define PTE_EXT_APX		(1 << 9)
-
-#ifndef __ASSEMBLY__
+#define PTE_EXT_XN		(_AT(pteval_t_bs, 1) << 0)         /* v6 */
+#define PTE_EXT_AP_MASK		(_AT(pteval_t_bs, 3) << 4)
+#define PTE_EXT_AP0		(_AT(pteval_t_bs, 1) << 4)
+#define PTE_EXT_AP1		(_AT(pteval_t_bs, 2) << 4)
+#define PTE_EXT_AP_UNO_SRO	(_AT(pteval_t_bs, 0) << 4)
+#define PTE_EXT_AP_UNO_SRW	(PTE_EXT_AP0)
+#define PTE_EXT_AP_URO_SRW	(PTE_EXT_AP1)
+#define PTE_EXT_AP_URW_SRW	(PTE_EXT_AP1|PTE_EXT_AP0)
+#define PTE_EXT_TEX(x)		(_AT(pteval_t_bs, (x)) << 6)       /* v5 */
+#define PTE_EXT_APX		(_AT(pteval_t_bs, 1) << 9)         /* v6 */
+#define PTE_EXT_COHERENT	(_AT(pteval_t_bs, 1) << 9)         /* XScale3 */
+#define PTE_EXT_SHARED		(_AT(pteval_t_bs, 1) << 10)        /* v6 */
+#define PTE_EXT_NG		(_AT(pteval_t_bs, 1) << 11)        /* v6 */
 
 /*
- * These are used to make use of C type-checking
+ *   - small page
  */
-typedef struct { unsigned long pte; } pte_t_bs;
-typedef struct { unsigned long pmd; } pmd_t_bs;
-typedef struct { unsigned long pgd[2]; } pgd_t_bs;
-typedef struct { unsigned long pgprot; } pgprot_t_bs;
+#define PTE_SMALL_AP_MASK	(_AT(pteval_t_bs, 0xff) << 4)
+#define PTE_SMALL_AP_UNO_SRO	(_AT(pteval_t_bs, 0x00) << 4)
+#define PTE_SMALL_AP_UNO_SRW	(_AT(pteval_t_bs, 0x55) << 4)
+#define PTE_SMALL_AP_URO_SRW	(_AT(pteval_t_bs, 0xaa) << 4)
+#define PTE_SMALL_AP_URW_SRW	(_AT(pteval_t_bs, 0xff) << 4)
 
-#endif
-
-#define pte_val_bs(x)		((x).pte)
-#define pmd_val_bs(x)		((x).pmd)
-#define pgd_val_bs(x)		((x).pgd[0])
-#define pgprot_val_bs(x)	((x).pgprot)
-
-#define __pte_bs(x)		((pte_t_bs) { (x) } )
-#define __pmd_bs(x)		((pmd_t_bs) { (x) } )
-#define __pgprot_bs(x)		((pgprot_t_bs) { (x) } )
-
-/*
- * The following macros handle the cache and bufferable bits...
- */
-#define _L_PTE_DEFAULT		L_PTE_PRESENT | L_PTE_YOUNG | \
-				L_PTE_CACHEABLE | L_PTE_BUFFERABLE
-#define _L_PTE_READ		L_PTE_USER | L_PTE_EXEC
+#define PHYS_MASK		(~0UL)
 
 #ifndef __ASSEMBLY__
 extern pgprot_t_bs		pgprot_kernel_bs;
 #endif
 
-#define PAGE_NONE		__pgprot_bs(_L_PTE_DEFAULT)
-#define PAGE_COPY		__pgprot_bs(_L_PTE_DEFAULT | _L_PTE_READ)
-#define PAGE_SHARED		__pgprot_bs(_L_PTE_DEFAULT | _L_PTE_READ | \
-							      L_PTE_WRITE)
-#define PAGE_READONLY		__pgprot_bs(_L_PTE_DEFAULT | _L_PTE_READ)
-#define PAGE_KERNEL		pgprot_kernel_bs
+#define __PAGE_NONE		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_RDONLY | \
+						L_PTE_XN | L_PTE_NONE) 
+#define __PAGE_SHARED		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
+						L_PTE_XN)
+#define __PAGE_SHARED_EXEC	__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER)
+#define __PAGE_COPY		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
+						L_PTE_RDONLY | L_PTE_XN)
+#define __PAGE_COPY_EXEC	__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
+						L_PTE_RDONLY)
+#define __PAGE_READONLY		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
+						L_PTE_RDONLY | L_PTE_XN)
+#define __PAGE_READONLY_EXEC	__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
+						L_PTE_RDONLY)
 
 /*
  * The table below defines the page protection levels that we insert into our
@@ -221,23 +332,23 @@ extern pgprot_t_bs		pgprot_kernel_bs;
  *  2) If we could do execute protection, then read is implied
  *  3) write implies read permissions 
  */
-#define __P000	PAGE_NONE
-#define __P001	PAGE_READONLY
-#define __P010	PAGE_COPY
-#define __P011	PAGE_COPY
-#define __P100	PAGE_READONLY
-#define __P101	PAGE_READONLY
-#define __P110	PAGE_COPY
-#define __P111	PAGE_COPY
+#define __P000	__PAGE_NONE
+#define __P001	__PAGE_READONLY
+#define __P010	__PAGE_COPY
+#define __P011	__PAGE_COPY
+#define __P100	__PAGE_READONLY_EXEC
+#define __P101	__PAGE_READONLY_EXEC
+#define __P110	__PAGE_COPY_EXEC
+#define __P111	__PAGE_COPY_EXEC
 
-#define __S000	PAGE_NONE
-#define __S001	PAGE_READONLY
-#define __S010	PAGE_SHARED
-#define __S011	PAGE_SHARED
-#define __S100	PAGE_READONLY
-#define __S101	PAGE_READONLY
-#define __S110	PAGE_SHARED
-#define __S111	PAGE_SHARED
+#define __S000	__PAGE_NONE
+#define __S001	__PAGE_READONLY
+#define __S010	__PAGE_SHARED
+#define __S011	__PAGE_SHARED
+#define __S100	__PAGE_READONLY_EXEC
+#define __S101	__PAGE_READONLY_EXEC
+#define __S110	__PAGE_SHARED_EXEC
+#define __S111	__PAGE_SHARED_EXEC
 
 #ifndef __ASSEMBLY__
 extern phys_addr_t swapper_pg_dir_bs;
@@ -268,6 +379,9 @@ static inline pte_t_bs *pmd_page_kernel_bs(pmd_t_bs pmd)
 	return __va_bs(ptr);
 }
 
+/* we don't need complex calculations here as the pmd is folded into the pgd */
+#define pmd_addr_end_bs(addr,end)	(end)
+
 /* to find an entry in a page-table-directory */
 #define pgd_index_bs(addr)		((addr) >> PGDIR_SHIFT)
 
@@ -275,6 +389,13 @@ static inline pte_t_bs *pmd_page_kernel_bs(pmd_t_bs pmd)
 
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k_bs(addr)		pgd_offset_bs(&init_mm_bs, addr)
+
+static inline pud_t_bs *pud_offset_bs(pgd_t_bs *pgd, unsigned long address)
+{
+	return (pud_t_bs *)pgd;
+}
+
+#define pud_addr_end_bs(addr, end)		(end)
 
 /* Find an entry in the second-level page table.. */
 #define pmd_offset_bs(dir, addr)	((pmd_t_bs *)(dir))
@@ -292,5 +413,18 @@ static inline pte_t_bs *pmd_page_kernel_bs(pmd_t_bs pmd)
 
 typedef void (*cpu_set_pte_ext_t)(pte_t_bs *, pte_t_bs, unsigned int);
 
+/*
+ * When walking page tables, get the address of the next boundary,
+ * or the end address of the range if that comes earlier.  Although no
+ * vma end wraps to 0, rounded up __boundary may wrap to 0 throughout.
+ */
+
+#define pgd_addr_end_bs(addr, end)					\
+({	unsigned long __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;	\
+	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+})
+
+
 #endif
+
 #endif

@@ -10,14 +10,30 @@ struct map_desc {
 
 struct meminfo;
 
-#define MT_DEVICE		0
-#define MT_CACHECLEAN		1
-#define MT_MINICLEAN		2
-#define MT_LOW_VECTORS		3
-#define MT_HIGH_VECTORS		4
-#define MT_MEMORY		5
-#define MT_ROM			6
-#define MT_IXP2000_DEVICE	7
+/*
+ * Architecture ioremap implementation.
+ */
+#define MT_DEVICE		0 
+#define MT_DEVICE_NONSHARED	1 
+#define MT_DEVICE_CACHED	2 
+#define MT_DEVICE_WC		3
+
+/* types 0-3 are defined in asm/io.h */
+enum {
+	MT_UNCACHED = 4,
+	MT_CACHECLEAN,
+	MT_MINICLEAN,
+	MT_LOW_VECTORS,
+	MT_HIGH_VECTORS,
+	MT_MEMORY_RWX,
+	MT_MEMORY_RW,
+	MT_ROM,
+	MT_MEMORY_RWX_NONCACHED,
+	MT_MEMORY_RW_DTCM,
+	MT_MEMORY_RWX_ITCM,
+	MT_MEMORY_RW_SO,
+	MT_MEMORY_DMA_READY,
+};
 
 extern void memtable_init_bs(struct meminfo *);
 

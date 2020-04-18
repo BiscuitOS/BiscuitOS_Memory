@@ -58,4 +58,6 @@ static inline void *phys_to_virt_bs(unsigned long x)
 #define __pa_bs(x)	__virt_to_phys_bs((unsigned long)(x))
 #define __va_bs(x)	((void *)__phys_to_virt_bs((unsigned long)(x)))
 
+#define PHYS_RELATIVE(v_data, v_text)	((v_data) - (v_text))
+
 #endif

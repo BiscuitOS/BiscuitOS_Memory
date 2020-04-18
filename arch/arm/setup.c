@@ -20,12 +20,16 @@
 #include "asm-generated/tlbflush.h"
 #include "asm-generated/cputype.h"
 #include "asm-generated/procinfo.h"
+#include "asm-generated/hwcap.h"
+#include "asm-generated/cachetype.h"
 
 #ifndef MEM_SIZE
 #define MEM_SIZE	(16*1024*1024)
 #endif
 
 extern void paging_init_bs(struct meminfo *, struct machine_desc *desc);
+extern void __init init_default_cache_policy_bs(unsigned long pmd);
+
 /*
  * These functions re-use the assembly code in head.S, which
  * already provide the required functionality.
@@ -38,6 +42,29 @@ static char command_line_bs[COMMAND_LINE_SIZE];
 static char __unused default_command_line_bs[COMMAND_LINE_SIZE] __initdata;
 
 unsigned int processor_id_bs;
+unsigned int cacheid_bs __read_mostly;
+EXPORT_SYMBOL_GPL(cacheid_bs);
+static struct machine_desc default_desc;
+
+static const char *proc_arch_bs[] = {
+	"undefined/unknown",
+	"3",
+	"4",
+	"4T",
+	"5",
+	"5T",
+	"5TE",
+	"5TEJ",
+	"6TEJ",
+	"7",
+	"7M",
+	"?(12)",
+	"?(13)",
+	"?(14)",
+	"?(15)",
+	"?(16)",
+	"?(17)",
+};
 
 /*
  * Cached cpu_architecture() result for use by assembler code.
@@ -150,13 +177,83 @@ static int __get_cpu_architecture_bs(void)
 	return cpu_arch;
 }
 
+/* FIXME: From ARMv7 Architecture */
+#define PMD_FLAGS_UP	PMD_SECT_WB
+static struct proc_info_list default_BiscuitOS_proc_info = {
+	.cpu_val	= 0x410fc090,
+	.cpu_mask	= 0xff0ffff0,
+	.__cpu_mm_mmu_flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+			      PMD_SECT_AP_READ | PMD_SECT_AF |
+			      PMD_FLAGS_UP,
+	.__cpu_io_mmu_flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+			      PMD_SECT_AP_READ | PMD_SECT_AF,
+	.arch_name	= "BiscuitOS_armv7",
+	.elf_name	= "v7",
+	.elf_hwcap	= HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB |
+			  HWCAP_FAST_MULT | HWCAP_EDSP | HWCAP_TLS,
+	.cpu_name	= "BiscuitOS ARMv7",
+}; 
+
 /*
  * locate processor in the list of supported processor types. The linker
  * builds this table for use for the entries in arch/arm/mm/proc-*.S
  */
 struct proc_info_list *lookup_processor_bs(u32 midr)
 {
-	return NULL;
+	struct proc_info_list *list = &default_BiscuitOS_proc_info;
+
+	return list;
+}
+
+int __pure cpu_architecture_bs(void)
+{
+	BUG_ON(__cpu_architecture_bs == CPU_ARCH_UNKNOWN);
+
+	return __cpu_architecture_bs;
+}
+
+static void __init cacheid_init_bs(void)
+{
+	unsigned int arch = cpu_architecture_bs();
+
+	if (arch >= CPU_ARCH_ARMv6) {
+		unsigned int cachetype = read_cpuid_cachetype_bs();
+
+		if ((arch == CPU_ARCH_ARMv7M) && !(cachetype & 0xf000f)) {
+			cacheid_bs = 0;
+		} else if ((cachetype & (7 << 29)) == 4 << 29) {
+			/* ARMv7 register format */
+			arch = CPU_ARCH_ARMv7;
+			cacheid_bs = CACHEID_VIPT_NONALIASING;
+			switch (cachetype & (3 << 14)) {
+			case (1 << 14):
+				cacheid_bs |= CACHEID_ASID_TAGGED;
+				break;
+			case (3 << 14):
+				cacheid_bs |= CACHEID_PIPT;
+				break;
+			}
+		} else {
+			arch = CPU_ARCH_ARMv6;
+			if (cachetype & (1 << 23))
+				cacheid_bs = CACHEID_VIPT_ALIASING;
+			else
+				cacheid_bs = CACHEID_VIPT_NONALIASING;
+		}
+	} else {
+		cacheid_bs = CACHEID_VIVT;
+	}
+
+	printk("CPU: %s data cache. %s instruction cache\n",
+		cache_is_vivt_bs() ? "VIVT" :
+		cache_is_vipt_aliasing_bs() ? "VIPT aliasing" :
+		cache_is_vipt_nonaliasing_bs() ? "PIPT / VIPT nonaliasing" :
+		"unknow", cache_is_vivt_bs() ? "VIVT" :
+		icache_is_vivt_asid_tagged_bs() ? "VIVT ASID tagged" :
+		icache_is_vipt_aliasing_bs() ? "VIPT aliasing" :
+		icache_is_pipt_bs() ? "PIPT" :
+		cache_is_vipt_nonaliasing_bs() ? 
+				"VIPT nonaliasing" : "unknown");
 }
 
 static void __init setup_processor_bs(void)
@@ -165,13 +262,21 @@ static void __init setup_processor_bs(void)
 	struct proc_info_list *list = lookup_processor_bs(midr);
 
 	__cpu_architecture_bs = __get_cpu_architecture_bs();
-	printk("ARCH %d\n", __cpu_architecture_bs);
 	
+#ifdef CONFIG_MMU
+	init_default_cache_policy_bs(list->__cpu_mm_mmu_flags);
+#endif
+
+	printk("CPU: %s [%#x] revision %d (ARMv%s), cr=%#lx\n",
+		list->cpu_name, midr, midr & 15,
+		proc_arch_bs[cpu_architecture_bs()], get_cr_bs());
+
+	cacheid_init_bs();
 }
 
 void __init setup_arch_bs(char **cmdline_p)
 {
-	struct machine_desc *mdesc = NULL;
+	struct machine_desc *mdesc = &default_desc;
 	/* BiscuitOS doesn't emulate ATAG and KBUILD, both from DTS */
 	char *from = (char *)cmdline_dts;
 
@@ -182,22 +287,4 @@ void __init setup_arch_bs(char **cmdline_p)
 	parse_cmdline_bs(cmdline_p, from);
 
 	paging_init_bs(&meminfo_bs, mdesc);
-}
-
-int cpu_architecture_bs(void)
-{
-	int cpu_arch;
-
-	if ((processor_id_bs & 0x0000f000) == 0) {
-		cpu_arch = CPU_ARCH_UNKNOWN;
-	} else if ((processor_id_bs & 0x0000f000) == 0x00007000) {
-		cpu_arch = (processor_id_bs & (1 << 23)) ? 
-				CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
-	} else {
-		cpu_arch = (processor_id_bs >> 16) & 7;
-		if (cpu_arch)
-			cpu_arch += CPU_ARCH_ARMv3;
-	}
-
-	return cpu_arch;
 }

@@ -1,0 +1,4 @@
+#ifndef _BISCUITOS_ARM_FIXMAP_H
+#define _BISCUITOS_ARM_FIXMAP_H
+
+#endif

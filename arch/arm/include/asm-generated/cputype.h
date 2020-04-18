@@ -51,6 +51,11 @@ static inline unsigned int __attribute_const__ read_cpuid_id_bs(void)
 	return read_cpuid_bs(CPUID_ID);
 }
 
+static inline unsigned int __attribute_const__ read_cpuid_cachetype_bs(void)
+{
+	return read_cpuid_bs(CPUID_CACHETYPE);
+}
+
 #endif
 
 #endif

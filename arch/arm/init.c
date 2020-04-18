@@ -353,4 +353,8 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 		mdesc->map_io();
 
 	flush_tlb_all_bs();
+
+	/*
+	 * initialize the zones within each node
+	 */
 }
