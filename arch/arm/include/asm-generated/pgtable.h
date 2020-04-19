@@ -401,12 +401,12 @@ static inline pud_t_bs *pud_offset_bs(pgd_t_bs *pgd, unsigned long address)
 #define pmd_offset_bs(dir, addr)	((pmd_t_bs *)(dir))
 
 /* Find an entry in the third-level page table.. */
-#define __pte_index_bs(addr)		(((addr) >> PAGE_SHIFT) & \
+#define __pte_index_bs(addr)		(((addr) >> PAGE_SHIFT_BS) & \
 						(PTRS_PER_PTE - 1))
 
 #define pte_offset_kernel_bs(dir,addr)	(pmd_page_kernel_bs(*(dir)) + \
 					__pte_index_bs(addr))
-#define pfn_pte_bs(pfn,prot)		(__pte_bs(((pfn) << PAGE_SHIFT) | \
+#define pfn_pte_bs(pfn,prot)		(__pte_bs(((pfn) << PAGE_SHIFT_BS) | \
 					pgprot_val_bs(prot)))
 
 #define set_pte_bs(ptep, pte)	cpu_v7_set_pte_ext_bs(ptep, pte, 0)

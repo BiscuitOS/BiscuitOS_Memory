@@ -8,6 +8,16 @@
  * published by the Free Software Foundation.
  */
 #include <linux/kernel.h>
+#include "biscuitos/mm.h"
+
+#ifndef CONFIG_DISCONTIGMEM
+/* use the per-pgdat data instead for discontigmem - mbligh */
+unsigned long max_mapnr_bs;
+struct page_bs *mem_map_bs;
+
+EXPORT_SYMBOL_GPL(max_mapnr_bs);
+EXPORT_SYMBOL_GPL(mem_map_bs);
+#endif
 
 /*
  * A number of key systems in x86 including ioremap() relay on the assumption

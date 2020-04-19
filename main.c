@@ -51,8 +51,9 @@ phys_addr_t BiscuitOS_ram_base;
 phys_addr_t BiscuitOS_ram_size;
 phys_addr_t swapper_pg_dir_bs;
 u32 BiscuitOS_PAGE_OFFSET;
-u32 BiscuitOS_high_memory;
-u32 BiscuitOS_low_memory;
+u32 BiscuitOS_high_size;
+u32 BiscuitOS_normal_size;
+u32 BiscuitOS_dma_size;
 u32 BiscuitOS_vmalloc_size;
 u32 BiscuitOS_pkmap_size;
 u32 BiscuitOS_fixmap_size;
@@ -62,7 +63,7 @@ char saved_command_line_bs[COMMAND_LINE_SIZE];
 /* Emulate Kernel image */
 unsigned long _stext_bs, _end_bs;
 /* Command line from DTS */
-const char *cmdline_dts;
+const char cmdline_dts[COMMAND_LINE_SIZE];
 /* init mem */
 extern struct mm_struct init_mm;
 struct mm_struct_bs init_mm_bs;
@@ -75,7 +76,7 @@ extern unsigned long phys_initrd_start_bs;
 extern unsigned long phys_initrd_size_bs;
 extern void *high_memory_bs;
 
-/* BiscuitOS architecture */
+/* FIXME: BiscuitOS architecture */
 static void start_kernel(void)
 {
 	const char *cmdline;
@@ -89,7 +90,6 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	struct device_node *mem;
 	const phandle *ph;
 	u32 array[2];
-	u32 data;
 	int ret;
 
 	/* Find memory node by phandle */
@@ -121,15 +121,22 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	/* Obtain dma-zone information */
+	ret = of_property_read_u32(mem, "dma-zone", &BiscuitOS_dma_size);
+	if (ret) {
+		printk("Unable to read BiscuitOS dma-zone\n");
+		return -EINVAL;
+	}
+
 	/* Obtain normal-zone information */
-	ret = of_property_read_u32(mem, "normal-zone", &BiscuitOS_low_memory);
+	ret = of_property_read_u32(mem, "normal-zone", &BiscuitOS_normal_size);
 	if (ret) {
 		printk("Unable to read BiscuitOS normal-zone\n");
 		return -EINVAL;
 	}
 
 	/* Obtain high-zone information */
-	ret = of_property_read_u32(mem, "high-zone", &BiscuitOS_high_memory);
+	ret = of_property_read_u32(mem, "high-zone", &BiscuitOS_high_size);
 	if (ret) {
 		printk("Unable to read BiscuitOS high-zone\n");
 		return -EINVAL;
@@ -150,6 +157,11 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	if ((BiscuitOS_normal_size + BiscuitOS_high_size + 
+				BiscuitOS_dma_size) > BiscuitOS_ram_size) {
+		panic("Incorrect BiscuitOS ARM on DTS\n");
+	}
+
 	/* Obtain fixmap-size information */
 	ret = of_property_read_u32(mem, "fixmap-size", &BiscuitOS_fixmap_size);
 	if (ret) {
@@ -157,12 +169,12 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	/* Obtain bootargs/cmdline */
-	ret = of_property_read_string(np, "cmdline", &cmdline_dts);
-	if (ret < 0) {
-		printk("Unable to read cmdline from BiscuitOS\n");
-		return -EINVAL;
-	}
+	/* Calculate memory map */
+	sprintf((char *)cmdline_dts, 
+		"mem_bs=%#lx@%#lx", 
+		(unsigned long)BiscuitOS_dma_size + BiscuitOS_normal_size,
+		(unsigned long)BiscuitOS_ram_base);
+	printk("CMDLINE: [%s]\n", cmdline_dts);
 
 	/* Obtain kernel image information */
 	ret = of_property_read_u32_array(mem, "kernel-image", array, 2);

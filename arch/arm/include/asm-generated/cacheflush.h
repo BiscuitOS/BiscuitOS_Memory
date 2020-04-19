@@ -26,4 +26,6 @@ extern void v7_flush_kern_cache_all_bs(void);
 
 #define flush_cache_all_bs()		__cpuc_flush_kern_all_bs()
 
+#define flush_dcache_page_bs(page)	do { } while (0)
+
 #endif

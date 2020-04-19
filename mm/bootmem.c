@@ -32,8 +32,8 @@ unsigned long __init bootmem_bootmap_pages_bs(unsigned long pages)
 	unsigned long mapsize;
 
 	mapsize = (pages+7)/8;
-	mapsize = (mapsize + ~PAGE_MASK) & PAGE_MASK;
-	mapsize >>= PAGE_SHIFT;
+	mapsize = (mapsize + ~PAGE_MASK_BS) & PAGE_MASK_BS;
+	mapsize >>= PAGE_SHIFT_BS;
 
 	return mapsize;
 }
@@ -41,18 +41,18 @@ unsigned long __init bootmem_bootmap_pages_bs(unsigned long pages)
 /*
  * Called once to set up the allocator itself
  */
-static unsigned long __init init_bootmem_core_bs(pg_data_t *pgdat,
+static unsigned long __init init_bootmem_core_bs(pg_data_t_bs *pgdat,
 	unsigned long mapstart, unsigned long start, unsigned long end)
 {
-	bootmem_data_t *bdata = pgdat->bdata;
+	bootmem_data_t_bs *bdata = pgdat->bdata;
 	unsigned long mapsize = ((end - start)+7)/8;
 
 	pgdat->pgdat_next = pgdat_list_bs;
 	pgdat_list_bs = pgdat;
 
 	mapsize = (mapsize + (sizeof(long) - 1UL)) & ~(sizeof(long) - 1UL);
-	bdata->node_bootmem_map = phys_to_virt_bs(mapstart << PAGE_SHIFT);
-	bdata->node_boot_start = (start << PAGE_SHIFT);
+	bdata->node_bootmem_map = phys_to_virt_bs(mapstart << PAGE_SHIFT_BS);
+	bdata->node_boot_start = (start << PAGE_SHIFT_BS);
 	bdata->node_low_pfn = end;
 
 	/*
@@ -64,7 +64,7 @@ static unsigned long __init init_bootmem_core_bs(pg_data_t *pgdat,
 	return mapsize;
 }
 
-static void __init free_bootmem_core_bs(bootmem_data_t *bdata,
+static void __init free_bootmem_core_bs(bootmem_data_t_bs *bdata,
 				unsigned long addr, unsigned long size)
 {
 	unsigned long i;
@@ -74,11 +74,12 @@ static void __init free_bootmem_core_bs(bootmem_data_t *bdata,
 	 * considered reserved.
 	 */
 	unsigned long sidx;
-	unsigned long eidx = (addr + size - bdata->node_boot_start)/PAGE_SIZE;
-	unsigned long end = (addr + size)/PAGE_SIZE;
+	unsigned long eidx = (addr + size - 
+				bdata->node_boot_start)/PAGE_SIZE_BS;
+	unsigned long end = (addr + size)/PAGE_SIZE_BS;
 
-	BUG_ON(!size);
-	BUG_ON(end > bdata->node_low_pfn);
+	BUG_ON_BS(!size);
+	BUG_ON_BS(end > bdata->node_low_pfn);
 
 	if (addr < bdata->last_success)
 		bdata->last_success = addr;
@@ -86,12 +87,12 @@ static void __init free_bootmem_core_bs(bootmem_data_t *bdata,
 	/*
 	 * Round up the beginning of the address.
 	 */
-	start = (addr + PAGE_SIZE-1) / PAGE_SIZE;
-	sidx = start - (bdata->node_boot_start/PAGE_SIZE);
+	start = (addr + PAGE_SIZE_BS-1) / PAGE_SIZE_BS;
+	sidx = start - (bdata->node_boot_start/PAGE_SIZE_BS);
 
 	for (i = sidx; i < eidx; i++) {
 		if (unlikely(!test_and_clear_bit(i, bdata->node_bootmem_map)))
-			BUG();
+			BUG_BS();
 	}
 }
 
@@ -100,7 +101,7 @@ static void __init free_bootmem_core_bs(bootmem_data_t *bdata,
  * might be used for boot-time allocations - or it might get added
  * to the free page pool later on.
  */
-static void __init reserve_bootmem_core_bs(bootmem_data_t *bdata, 
+static void __init reserve_bootmem_core_bs(bootmem_data_t_bs *bdata, 
 				unsigned long addr, unsigned long size)
 {
 	unsigned long i;
@@ -108,19 +109,20 @@ static void __init reserve_bootmem_core_bs(bootmem_data_t *bdata,
 	 * round up, partially reserved pages are considered
 	 * fully reserved.
 	 */
-	unsigned long sidx = (addr - bdata->node_boot_start)/PAGE_SIZE;
+	unsigned long sidx = (addr - bdata->node_boot_start)/PAGE_SIZE_BS;
 	unsigned long eidx = (addr + size - bdata->node_boot_start +
-					PAGE_SIZE-1)/PAGE_SIZE;
-	unsigned long end = (addr + size + PAGE_SIZE-1)/PAGE_SIZE;
+					PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
+	unsigned long end = (addr + size + PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
 
-	BUG_ON(!size);
-	BUG_ON(sidx >= eidx);
-	BUG_ON((addr >> PAGE_SHIFT) >= bdata->node_low_pfn);
-	BUG_ON(end > bdata->node_low_pfn);
+	BUG_ON_BS(!size);
+	BUG_ON_BS(sidx >= eidx);
+	BUG_ON_BS((addr >> PAGE_SHIFT_BS) >= bdata->node_low_pfn);
+	BUG_ON_BS(end > bdata->node_low_pfn);
 
 	for (i = sidx; i < eidx; i++)
 		if (test_and_set_bit(i, bdata->node_bootmem_map)) {
-			printk("hm, page %#lx reserved twice.\n", i*PAGE_SIZE);
+			printk("hm, page %#lx reserved twice.\n", 
+					i*PAGE_SIZE_BS);
 		}
 }
 
@@ -137,7 +139,7 @@ static void __init reserve_bootmem_core_bs(bootmem_data_t *bdata,
  * NOTE: This function is _not_ reentrant.
  */
 static void * __init
-__alloc_bootmem_core_bs(struct bootmem_data *bdata, unsigned long size,
+__alloc_bootmem_core_bs(struct bootmem_data_bs *bdata, unsigned long size,
 			unsigned long align, unsigned long goal)
 {
 	unsigned long offset, remaining_size, areasize, preferred;
@@ -146,23 +148,23 @@ __alloc_bootmem_core_bs(struct bootmem_data *bdata, unsigned long size,
 
 	if (!size) {
 		printk("__alloc_bootmem_core(): zero-sized request\n");
-		BUG();
+		BUG_BS();
 	}
-	BUG_ON(align & (align-1));
+	BUG_ON_BS(align & (align-1));
 
-	eidx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
+	eidx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT_BS);
 	offset = 0;
 	if (align &&
 		(bdata->node_boot_start & (align - 1UL)) != 0)
 		offset = (align - (bdata->node_boot_start & (align - 1UL)));
-	offset >>= PAGE_SHIFT;
+	offset >>= PAGE_SHIFT_BS;
 
 	/*
 	 * We try to allocate bootmem pages above 'goal'
 	 * first, then we try to allocate lower pages.
 	 */
 	if (goal && (goal >= bdata->node_boot_start) &&
-		((goal >> PAGE_SHIFT) < bdata->node_low_pfn)) {
+		((goal >> PAGE_SHIFT_BS) < bdata->node_low_pfn)) {
 		preferred = goal - bdata->node_boot_start;
 
 		if (bdata->last_success >= preferred)
@@ -170,10 +172,10 @@ __alloc_bootmem_core_bs(struct bootmem_data *bdata, unsigned long size,
 	} else
 		preferred = 0;
 
-	preferred = ((preferred + align - 1) & ~(align - 1)) >> PAGE_SHIFT;
+	preferred = ((preferred + align - 1) & ~(align - 1)) >> PAGE_SHIFT_BS;
 	preferred += offset;
-	areasize = (size+PAGE_SIZE-1)/PAGE_SIZE;
-	incr = align >> PAGE_SHIFT ? : 1;
+	areasize = (size+PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
+	incr = align >> PAGE_SHIFT_BS ? : 1;
 
 restart_scan:
 	for (i = preferred; i < eidx; i += incr) {
@@ -202,38 +204,38 @@ restart_scan:
 	return NULL;
 
 found:
-	bdata->last_success = start << PAGE_SHIFT;
-	BUG_ON(start >= eidx);
+	bdata->last_success = start << PAGE_SHIFT_BS;
+	BUG_ON_BS(start >= eidx);
 
 	/*
 	 * Is the next page of the previous allocation-end the start
 	 * of this allocation's buffer? If yes then we can 'merge'
 	 * the previous partial page with this allocation.
 	 */
-	if (align < PAGE_SIZE &&
+	if (align < PAGE_SIZE_BS &&
 		bdata->last_offset && bdata->last_pos+1 == start) {
 		offset = (bdata->last_offset+align-1) & ~(align-1);
-		BUG_ON(offset > PAGE_SIZE);
-		remaining_size = PAGE_SIZE - offset;
+		BUG_ON_BS(offset > PAGE_SIZE_BS);
+		remaining_size = PAGE_SIZE_BS - offset;
 		if (size < remaining_size) {
 			areasize = 0;
 			/* last_pos unchanged */
 			bdata->last_offset = offset+size;
-			ret = phys_to_virt_bs(bdata->last_pos*PAGE_SIZE +
+			ret = phys_to_virt_bs(bdata->last_pos*PAGE_SIZE_BS +
 					offset + bdata->node_boot_start);
 		} else {
 			remaining_size = size - remaining_size;
-			areasize = (remaining_size+PAGE_SIZE-1)/PAGE_SIZE;
-			ret = phys_to_virt_bs(bdata->last_pos*PAGE_SIZE +
+			areasize = (remaining_size+PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
+			ret = phys_to_virt_bs(bdata->last_pos*PAGE_SIZE_BS +
 					offset + bdata->node_boot_start);
 			bdata->last_pos = start+areasize-1;
 			bdata->last_offset = remaining_size;
 		}
-		bdata->last_offset &= ~PAGE_MASK;
+		bdata->last_offset &= ~PAGE_MASK_BS;
 	} else {
 		bdata->last_pos = start + areasize - 1;
-		bdata->last_offset = size & ~PAGE_MASK;
-		ret = phys_to_virt_bs(start * PAGE_SIZE + 
+		bdata->last_offset = size & ~PAGE_MASK_BS;
+		ret = phys_to_virt_bs(start * PAGE_SIZE_BS + 
 					bdata->node_boot_start);
 	}
 
@@ -242,25 +244,25 @@ found:
 	 */
 	for (i = start; i < start+areasize; i++)
 		if (unlikely(test_and_set_bit(i, bdata->node_bootmem_map)))
-			BUG();
+			BUG_BS();
 	memset(ret, 0, size);
 	return ret;
 }
 
 unsigned long __init
-init_bootmem_node_bs(pg_data_t *pgdat, unsigned long freepfn,
+init_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long freepfn,
 			unsigned long startpfn, unsigned long endpfn)
 {
 	return (init_bootmem_core_bs(pgdat, freepfn, startpfn, endpfn));
 }
 
-void __init free_bootmem_node_bs(pg_data_t *pgdat, unsigned long physaddr,
+void __init free_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long physaddr,
 						unsigned long size)
 {
 	free_bootmem_core_bs(pgdat->bdata, physaddr, size);
 }
 
-void __init reserve_bootmem_node_bs(pg_data_t *pgdat, unsigned long physaddr,
+void __init reserve_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long physaddr,
 					unsigned long size)
 {
 	reserve_bootmem_core_bs(pgdat->bdata, physaddr, size);
@@ -269,7 +271,7 @@ void __init reserve_bootmem_node_bs(pg_data_t *pgdat, unsigned long physaddr,
 void * __init __alloc_bootmem_bs(unsigned long size, unsigned long align,
 		unsigned long goal)
 {
-	pg_data_t *pgdat = pgdat_list_bs;
+	pg_data_t_bs *pgdat = pgdat_list_bs;
 	void *ptr;
 
 	for_each_pgdat_bs(pgdat)
@@ -282,4 +284,16 @@ void * __init __alloc_bootmem_bs(unsigned long size, unsigned long align,
 	printk(KERN_ALERT "bootmem alloc of %lu bytes failed!\n", size);
 	panic("Out of memory");
 	return NULL;
+}
+
+void *__init __alloc_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long size,
+		unsigned long align, unsigned long goal)
+{
+	void *ptr;
+
+	ptr = __alloc_bootmem_core_bs(pgdat->bdata, size, align, goal);
+	if (ptr)
+		return (ptr);
+
+	return __alloc_bootmem_bs(size, align, goal);
 }

@@ -412,7 +412,7 @@ alloc_init_page_bs(unsigned long virt, unsigned long phys,
 	ptep = pte_offset_kernel_bs(pmdp, virt);
 
 	/* FIXME: Use ARMv7 */
-	set_pte_bs(ptep, pfn_pte_bs(phys >> PAGE_SHIFT, prot));
+	set_pte_bs(ptep, pfn_pte_bs(phys >> PAGE_SHIFT_BS, prot));
 }
 
 /*
@@ -524,12 +524,12 @@ static void __init __create_mapping_bs(struct mm_struct_bs *mm,
 
 	type = &mem_types_bs[md->type];
 
-	addr = md->virtual & PAGE_MASK;
+	addr = md->virtual & PAGE_MASK_BS;
 	phys = md->physical;
-	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+	length = PAGE_ALIGN_BS(md->length + (md->virtual & ~PAGE_MASK_BS));
 
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
-		printk("BUG: map for %#llx at %#x can not be mapped "
+		printk("BUG: map for %#llx at %#lx can not be mapped "
 			"using pages, ignoring.\n", 
 			(long long)(md->physical), addr);
 		return;
@@ -576,7 +576,6 @@ static void __init create_mapping_bs(struct map_desc *md)
 void __init memtable_init_bs(struct meminfo *mi)
 {
 	struct map_desc map;
-	unsigned long address = 0;
 	int i;
 
 	build_mem_type_table_bs();

@@ -26,7 +26,8 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.S)) 
 
 ## CFlags
-ccflags-y		+= -DCONFIG_NODES_SHIFT=2
+ccflags-y		+= -DCONFIG_NODES_SHIFT=0
+ccflags-y		+= -DCONFIG_NR_CPUS_BS=8
 ## ASFlags
 asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
 asflags-y		+= -I$(PWD)/include

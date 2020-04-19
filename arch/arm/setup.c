@@ -35,7 +35,7 @@ extern void __init init_default_cache_policy_bs(unsigned long pmd);
  * already provide the required functionality.
  */
 extern struct proc_info_list *lookup_processor_type_bs(unsigned int);
-extern const char *cmdline_dts;
+extern const char cmdline_dts[COMMAND_LINE_SIZE];
 
 static struct meminfo meminfo_bs = { 0, };
 static char command_line_bs[COMMAND_LINE_SIZE];
@@ -99,7 +99,7 @@ static void early_param_0(char **p)
 	
 	meminfo_bs.bank[meminfo_bs.nr_banks].start = start;
 	meminfo_bs.bank[meminfo_bs.nr_banks].size  = size;
-	meminfo_bs.bank[meminfo_bs.nr_banks].node  = PHYS_TO_NID(start);
+	meminfo_bs.bank[meminfo_bs.nr_banks].node  = PHYS_TO_NID_BS(start);
 	meminfo_bs.nr_banks += 1;
 }
 __early_param_bs("mem_bs=", early_param_0);
@@ -207,7 +207,7 @@ struct proc_info_list *lookup_processor_bs(u32 midr)
 
 int __pure cpu_architecture_bs(void)
 {
-	BUG_ON(__cpu_architecture_bs == CPU_ARCH_UNKNOWN);
+	BUG_ON_BS(__cpu_architecture_bs == CPU_ARCH_UNKNOWN);
 
 	return __cpu_architecture_bs;
 }
@@ -267,7 +267,7 @@ static void __init setup_processor_bs(void)
 	init_default_cache_policy_bs(list->__cpu_mm_mmu_flags);
 #endif
 
-	printk("CPU: %s [%#x] revision %d (ARMv%s), cr=%#lx\n",
+	printk("CPU: %s [%#x] revision %d (ARMv%s), cr=%#x\n",
 		list->cpu_name, midr, midr & 15,
 		proc_arch_bs[cpu_architecture_bs()], get_cr_bs());
 
