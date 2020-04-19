@@ -70,19 +70,10 @@ struct mm_struct_bs init_mm_bs;
 /* FIXME: TLB information: From ARMv7 Hard-Code */
 unsigned long BiscuitOS_tlb_flags = 0xd0091010;
 
-/* setup */
-extern void setup_arch_bs(char **);
 extern unsigned long phys_initrd_start_bs;
 extern unsigned long phys_initrd_size_bs;
 extern void *high_memory_bs;
-
-/* FIXME: BiscuitOS architecture */
-static void start_kernel(void)
-{
-	const char *cmdline;
-
-	setup_arch_bs((char **)&cmdline);
-}
+extern asmlinkage void __init start_kernel_bs(void);
 
 static int BiscuitOS_memory_probe(struct platform_device *pdev)
 {
@@ -198,7 +189,7 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	/* swapper_pg_dir and init_mm */
 	init_mm_bs.pgd = (pgd_t_bs *)init_mm.pgd;
 
-	start_kernel();
+	start_kernel_bs();
 
 	printk("Hello BiscuitOS\n");
 
