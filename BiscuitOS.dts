@@ -1,0 +1,46 @@
+/*
+ * BiscuitOS Memory Layout
+ *
+ * (C) 2019.01.01 BuddyZhang1 <buddy.zhang@aliyun.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/ {
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* BiscuitOS Memory */
+		BiscuitOS_memory: memory@70000000 {
+			/* 100 MB of BiscuitOS RAM */
+			reg = <0x70000000 0x6400000>;
+			/* DMA Zone length: 4M */
+			dma-zone = <0x400000>;
+			/* Normal Zone length: 64M */
+			normal-zone = <0x4000000>;
+			/* High Zone length: 32M */
+			high-zone = <0x2000000>;
+			/* Start address for Kernel virtual space*/
+			page-offset = <0x90000000>;
+			/* vmalloc size: 28M */
+			vmalloc-size = <0x1C00000>;
+			/* PKMAP size: 2M */
+			pkmap-size = <0x200000>;
+			/* Fixmap size: PAGE_SIZE */
+			fixmap-size = <0x1000>;
+			/* The Virtual Address for Kernel Image */
+			kernel-image = <0x90500000 0x10000>;
+			/* The Physical Address for INITRD */
+			initrd = <0x70600000 0x100000>;
+		};
+	};
+
+	BiscuitOS {
+		compatible = "BiscuitOS,Memory-Manager";
+		status = "okay";
+		ram = <&BiscuitOS_memory>;
+	};
+};

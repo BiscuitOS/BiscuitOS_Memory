@@ -1,0 +1,6 @@
+#ifndef _BISCUITOS_ARM_HIGHMEM_H
+#define _BISCUITOS_ARM_HIGHMEM_H
+
+#define LAST_PKMAP_BS	512
+
+#endif

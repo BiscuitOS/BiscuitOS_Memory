@@ -26,6 +26,8 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/init/*.c))
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.c)) 
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.S)) 
 
+# LD-scripts
+ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
 ## CFlags
 ccflags-y		+= -DCONFIG_NODES_SHIFT=0
 ccflags-y		+= -DCONFIG_NR_CPUS_BS=8

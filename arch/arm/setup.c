@@ -77,7 +77,7 @@ int __cpu_architecture_bs __read_mostly = CPU_ARCH_UNKNOWN;
  * Pick out the memory size. We look for mem=size@start,
  * where start and size are "size[KkMm]"
  */
-static void early_param_0(char **p)
+static void early_mem_bs(char **p)
 {
 	static int usermem __initdata = 0;
 	unsigned long size, start;
@@ -102,10 +102,7 @@ static void early_param_0(char **p)
 	meminfo_bs.bank[meminfo_bs.nr_banks].node  = PHYS_TO_NID_BS(start);
 	meminfo_bs.nr_banks += 1;
 }
-__early_param_bs("mem_bs=", early_param_0);
-
-static struct early_params *__early_begin = &__early_early_param_0;
-static struct early_params *__early_end = &__early_early_param_0 + 1;
+__early_param_bs("mem_bs=", early_mem_bs);
 
 /*
  * Initial parsing of the command line.
@@ -117,9 +114,11 @@ static void __init parse_cmdline_bs(char **cmdline_p, char *from)
 
 	for (;;) {
 		if (c == ' ') {
-			struct early_params *p;
+			extern struct early_params_bs __early_begin_bs;
+			extern struct early_params_bs __early_end_bs;
+			struct early_params_bs *p;
 
-			for (p = __early_begin; p < __early_end; p++) {
+			for (p = &__early_begin_bs; p < &__early_end_bs; p++) {
 				int len = strlen(p->arg);
 
 				if (memcmp(from, p->arg, len) == 0) {

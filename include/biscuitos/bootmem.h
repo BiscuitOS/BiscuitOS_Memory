@@ -43,6 +43,9 @@ extern void * __init __alloc_bootmem_bs(unsigned long,
 extern void * __init __alloc_bootmem_node_bs(pg_data_t_bs *, 
 	unsigned long, unsigned long, unsigned long);
 
+#define alloc_bootmem_bs(x) \
+	__alloc_bootmem_bs((x), SMP_CACHE_BYTES_BS, \
+						__pa_bs(MAX_DMA_ADDRESS_BS))
 #define alloc_bootmem_node_bs(pgdat, x) \
 	__alloc_bootmem_node_bs((pgdat), (x), SMP_CACHE_BYTES_BS, \
 						__pa_bs(MAX_DMA_ADDRESS_BS))

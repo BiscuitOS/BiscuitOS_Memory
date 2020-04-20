@@ -202,7 +202,7 @@ static int BiscuitOS_memory_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id BiscuitOS_memory_of_match[] = {
-	{ .compatible = "BiscuitOS,memory", },
+	{ .compatible = "BiscuitOS,Memory-Manager", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, BiscuitOS_memory_of_match);

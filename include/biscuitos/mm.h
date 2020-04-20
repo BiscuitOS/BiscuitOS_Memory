@@ -93,5 +93,6 @@ extern pgprot_t_bs protection_map_bs[16];
 extern void __init free_area_init_node_bs(int nid, struct pglist_data_bs *pgdat,
 		unsigned long *zones_size, unsigned long node_start_pfn,
 		unsigned long *zhole_size);
+extern void __init page_address_init_bs(void);
 
 #endif

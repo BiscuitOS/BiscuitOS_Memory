@@ -30,13 +30,17 @@ struct meminfo {
 /*
  * Early command line parameters
  */
-struct early_params {
+struct early_params_bs {
 	const char *arg;
 	void (*fn)(char **p);
 };
 
+#ifndef __attribute_used__
+#define __attribute_used__	__attribute__((__used__))
+#endif
+
 #define __early_param_bs(name,fn)					\
-static struct early_params __early_##fn __attribute__((__unused__))	\
+static struct early_params_bs __early_##fn __attribute_used__		\
 __attribute__((__section__("__early_param_bs"))) = { name, fn }
 
 #endif
