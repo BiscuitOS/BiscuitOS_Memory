@@ -15,12 +15,16 @@
 #include "biscuitos/mm.h"
 #include "biscuitos/bootmem.h"
 #include "asm-generated/memory.h"
+#include "asm-generated/setup.h"
 
 /* setup */
 extern void setup_arch_bs(char **);
 
 unsigned long __per_cpu_offset_bs[NR_CPUS_BS];
 EXPORT_SYMBOL_GPL(__per_cpu_offset_bs);
+
+/* Untouched command line (eg. for /proc) saved by arch-specific code. */
+char saved_command_line_bs[COMMAND_LINE_SIZE_BS];
 
 static void __init setup_per_cpu_areas_bs(void)
 {
@@ -53,4 +57,8 @@ asmlinkage void __init start_kernel_bs(void)
 	printk(KERN_NOTICE);
 	setup_arch_bs((char **)&cmdline);
 	setup_per_cpu_areas_bs();
+
+	build_all_zonelists_bs();
+	page_alloc_init_bs();
+	printk(KERN_NOTICE "Kernel command line: %s\n", saved_command_line_bs);
 }

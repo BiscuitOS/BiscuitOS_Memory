@@ -2,6 +2,7 @@
 #define _BISCUITOS_MM_H
 
 #include "biscuitos/mmzone.h"
+#include "biscuitos/gfp.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/pgtable.h"
 #include "asm-generated/page.h"
@@ -85,6 +86,10 @@ static inline void set_page_zone_bs(struct page_bs *page,
 static inline void reset_page_mapcount_bs(struct page_bs *page)
 {
 	atomic_set(&(page)->_mapcount, -1);
+}
+
+static inline void page_alloc_init_bs(void)
+{
 }
 
 struct pglist_data_bs;

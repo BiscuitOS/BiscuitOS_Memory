@@ -31,6 +31,8 @@ ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
 ## CFlags
 ccflags-y		+= -DCONFIG_NODES_SHIFT=0
 ccflags-y		+= -DCONFIG_NR_CPUS_BS=8
+# Support HighMem
+ccflags-y		+= -DCONFIG_HIGHMEM_BS
 ## ASFlags
 asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
 asflags-y		+= -I$(PWD)/include

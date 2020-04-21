@@ -24,6 +24,10 @@
 
 #ifndef __ASSEMBLY__
 
+#undef STRICT_MM_TYPECHECKS
+
+#ifdef STRICT_MM_TYPECHECKS
+
 /*
  * These are used to make use of C type-checking
  */
@@ -31,11 +35,6 @@ typedef struct { unsigned long pte; } pte_t_bs;
 typedef struct { unsigned long pmd; } pmd_t_bs;
 typedef struct { unsigned long pgd[2]; } pgd_t_bs;
 typedef struct { unsigned long pgprot; } pgprot_t_bs;
-
-typedef u32 pteval_t_bs;
-typedef u32 pmdval_t_bs;
-
-typedef struct { pgd_t_bs pgd; } pud_t_bs;
 
 #define pte_val_bs(x)		((x).pte)
 #define pmd_val_bs(x)		((x).pmd)
@@ -45,6 +44,31 @@ typedef struct { pgd_t_bs pgd; } pud_t_bs;
 #define __pte_bs(x)		((pte_t_bs) { (x) } )
 #define __pmd_bs(x)		((pmd_t_bs) { (x) } )
 #define __pgprot_bs(x)		((pgprot_t_bs) { (x) } )
+
+#else
+/*
+ * .. while these make it easier on the compiler
+ */
+typedef unsigned long pte_t_bs;
+typedef unsigned long pmd_t_bs;
+typedef unsigned long pgd_t_bs[2];
+typedef unsigned long pgprot_t_bs;
+
+#define pte_val_bs(x)		(x)
+#define pmd_val_bs(x)		(x)
+#define pgd_val_bs(x)		((x)[0])
+#define pgprot_val_bs(x)	(x)
+
+#define __pte_bs(x)		(x)
+#define __pmd_bs(x)		(x)
+#define __pgprot_bs(x)		(x)
+
+#endif
+
+typedef struct { pgd_t_bs pgd; } pud_t_bs;
+
+typedef u32 pteval_t_bs;
+typedef u32 pmdval_t_bs;
 
 #endif
 
@@ -352,10 +376,9 @@ extern pgprot_t_bs		pgprot_kernel_bs;
 
 #ifndef __ASSEMBLY__
 extern phys_addr_t swapper_pg_dir_bs;
-/* FIXME: How to fix these header on here? */
+extern void cpu_v7_set_pte_ext_bs(pte_t_bs *, pte_t_bs, unsigned int);
 #include "biscuitos/mm_types.h"
 extern struct mm_struct_bs init_mm_bs;
-extern void cpu_v7_set_pte_ext_bs(pte_t_bs *, pte_t_bs, unsigned int);
 
 #define pmd_none_bs(pmd)	(!pmd_val_bs(pmd))
 

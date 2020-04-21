@@ -270,4 +270,6 @@ static inline int is_highmem_idx_bs(int idx)
 	return (idx == ZONE_HIGHMEM_BS);
 }
 
+extern void __init build_all_zonelists_bs(void);
+
 #endif

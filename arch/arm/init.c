@@ -30,6 +30,7 @@ extern unsigned long _end_bs;
 unsigned long phys_initrd_start_bs __initdata = 0;
 unsigned long phys_initrd_size_bs __initdata = 0;
 unsigned long initrd_start_bs, initrd_end_bs;
+extern struct meminfo highmeminfo_bs;
 
 /*
  * empty_zero_page is a special page that is used for
@@ -417,6 +418,23 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 		 * requirements for this machine type.
 		 */
 		arch_adjust_zones_bs(node, zone_size, zhole_size);
+
+#ifdef CONFIG_HIGHMEM_BS
+		/*
+		 * FIXME: Default ARM doesn't support HighMem ZONE,
+		 * But BiscuitOS support Highmem ZONE on ARM.
+		 */
+		for (i = 0; i < highmeminfo_bs.nr_banks; i++) {
+			zone_size[2] += 
+				highmeminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
+			zhole_size[2] = zone_size[2];
+			if (highmeminfo_bs.bank[i].node != node)
+				continue;
+
+			zhole_size[2] -= 
+				highmeminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
+		}
+#endif
 
 		free_area_init_node_bs(node, pgdat, zone_size,
 			bdata->node_boot_start >> PAGE_SHIFT_BS, zhole_size);

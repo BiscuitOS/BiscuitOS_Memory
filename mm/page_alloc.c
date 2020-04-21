@@ -8,6 +8,7 @@
  * published by the Free Software Foundation.
  */
 #include <linux/kernel.h>
+#include "biscuitos/kernel.h"
 #include "biscuitos/nodemask.h"
 #include "biscuitos/mmzone.h"
 #include "biscuitos/bootmem.h"
@@ -137,7 +138,7 @@ void __init memmap_init_zone_bs(unsigned long size, int nid,
 		INIT_LIST_HEAD(&page->lru);
 		start_pfn++;
 #ifdef WAIT_PAGE_VIRTUAL
-		BUG();
+		BS_DUP();
 #endif
 	}
 }
@@ -293,4 +294,88 @@ void __init free_area_init_node_bs(int nid, struct pglist_data_bs *pgdat,
 	alloc_node_mem_map_bs(pgdat);
 
 	free_area_init_core_bs(pgdat, zones_size, zhole_size);
+}
+
+/*
+ * Builds allocation fallback zone lists.
+ */
+static int __init build_zonelists_node_bs(pg_data_t_bs *pgdat,
+				struct zonelist_bs *zonelist, int j, int k)
+{
+	switch (k) {
+		struct zone_bs *zone;
+	default:
+		BUG_BS();
+	case ZONE_HIGHMEM_BS:
+		zone = pgdat->node_zones + ZONE_HIGHMEM_BS;
+		if (zone->present_pages) {
+#ifndef CONFIG_HIGHMEM_BS
+			BUG_BS();
+#endif
+			zonelist->zones[j++] = zone;
+		}
+	case ZONE_NORMAL_BS:
+		zone = pgdat->node_zones + ZONE_NORMAL_BS;
+		if (zone->present_pages)
+			zonelist->zones[j++] = zone;
+	case ZONE_DMA_BS:
+		zone = pgdat->node_zones + ZONE_DMA_BS;
+		if (zone->present_pages)
+			zonelist->zones[j++] = zone;
+	}
+
+	return j;
+}
+
+static void __init build_zonelists_bs(pg_data_t_bs *pgdat)
+{
+	int i, j, k, node, local_node;
+
+	local_node = pgdat->node_id;
+	for (i = 0; i < GFP_ZONETYPES_BS; i++) {
+		struct zonelist_bs *zonelist;
+
+		zonelist = pgdat->node_zonelists + i;
+
+		j = 0;
+		k = ZONE_NORMAL_BS;
+		if (i & __GFP_HIGHMEM_BS)
+			k = ZONE_HIGHMEM_BS;
+		if (i & __GFP_DMA_BS)
+			k = ZONE_DMA_BS;
+
+		j = build_zonelists_node_bs(pgdat, zonelist, j, k);
+		/*
+		 * Now we build the zonelist so that it contains the zones
+		 * of all the other nodes.
+		 * We don't want to pressure a particular node, so when
+		 * building the zones for node N, we make sure that the
+		 * zones coming right after the local ones are those from
+		 * node N+1 (modulo N)
+		 */
+		for (node = local_node + 1; node < MAX_NUMNODES_BS; node++) {
+			if (!node_online_bs(node))
+				continue;
+
+			j = build_zonelists_node_bs(NODE_DATA_BS(node), 
+							zonelist, j, k);
+		}
+		for (node = 0; node < local_node; node++) {
+			if (!node_online_bs(node))
+				continue;
+			j = build_zonelists_node_bs(NODE_DATA_BS(node),
+					zonelist, j, k);
+		}
+
+		zonelist->zones[j] = NULL;
+	}
+}
+
+void __init build_all_zonelists_bs(void)
+{
+	int i;
+
+	for_each_online_node_bs(i)
+		build_zonelists_bs(NODE_DATA_BS(i));
+	printk("Build %i zonelists\n", num_online_nodes_bs());
 }

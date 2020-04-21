@@ -35,11 +35,12 @@ extern void __init init_default_cache_policy_bs(unsigned long pmd);
  * already provide the required functionality.
  */
 extern struct proc_info_list *lookup_processor_type_bs(unsigned int);
-extern const char cmdline_dts[COMMAND_LINE_SIZE];
+extern const char cmdline_dts[COMMAND_LINE_SIZE_BS];
 
 static struct meminfo meminfo_bs = { 0, };
-static char command_line_bs[COMMAND_LINE_SIZE];
-static char __unused default_command_line_bs[COMMAND_LINE_SIZE] __initdata;
+struct meminfo highmeminfo_bs = { 0, };
+static char command_line_bs[COMMAND_LINE_SIZE_BS];
+static char __unused default_command_line_bs[COMMAND_LINE_SIZE_BS] __initdata;
 
 unsigned int processor_id_bs;
 unsigned int cacheid_bs __read_mostly;
@@ -105,6 +106,38 @@ static void early_mem_bs(char **p)
 __early_param_bs("mem_bs=", early_mem_bs);
 
 /*
+ * Pick out the high memory size. We look for highmem=size@start,
+ * where start and size are "size[KkMm]"
+ */
+static void early_highmem_bs(char **p)
+{
+	static int usermem __initdata = 0;
+	unsigned long size, start;
+
+	/*
+	 * If the user specifies memory size, we
+	 * blow away any automatically generated
+	 * size.
+	 */
+	if (usermem == 0) {
+		usermem = 1;
+		highmeminfo_bs.nr_banks = 0;
+	}
+
+	start = PHYS_OFFSET_BS;
+	size = memparse(*p, p);
+	if (**p == '@')
+		start = memparse(*p + 1, p);
+	
+	highmeminfo_bs.bank[highmeminfo_bs.nr_banks].start = start;
+	highmeminfo_bs.bank[highmeminfo_bs.nr_banks].size  = size;
+	highmeminfo_bs.bank[highmeminfo_bs.nr_banks].node  = 
+						PHYS_TO_NID_BS(start);
+	highmeminfo_bs.nr_banks += 1;
+}
+__early_param_bs("highmem_bs=", early_highmem_bs);
+
+/*
  * Initial parsing of the command line.
  */
 static void __init parse_cmdline_bs(char **cmdline_p, char *from)
@@ -136,7 +169,7 @@ static void __init parse_cmdline_bs(char **cmdline_p, char *from)
 		c = *from++;
 		if (!c)
 			break;
-		if (COMMAND_LINE_SIZE <= ++len)
+		if (COMMAND_LINE_SIZE_BS <= ++len)
 			break;
 		*to++ = c;
 	}
@@ -281,8 +314,8 @@ void __init setup_arch_bs(char **cmdline_p)
 
 	setup_processor_bs();
 
-	memcpy(saved_command_line_bs, from, COMMAND_LINE_SIZE);
-	saved_command_line_bs[COMMAND_LINE_SIZE - 1] = '\0';
+	memcpy(saved_command_line_bs, from, COMMAND_LINE_SIZE_BS);
+	saved_command_line_bs[COMMAND_LINE_SIZE_BS - 1] = '\0';
 	parse_cmdline_bs(cmdline_p, from);
 
 	paging_init_bs(&meminfo_bs, mdesc);

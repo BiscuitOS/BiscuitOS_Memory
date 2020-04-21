@@ -37,6 +37,12 @@ static inline int __nodes_weight_bs(const nodemask_t_bs *srcp, int nbits)
 	return bitmap_weight(srcp->bits, nbits);
 }
 
+#define nodes_clear_bs(dst) __nodes_clear_bs(&(dst), MAX_NUMNODES_BS)
+static inline void __nodes_clear_bs(nodemask_t_bs *dstp, int nbits)
+{
+	bitmap_zero(dstp->bits, nbits);
+}
+
 /* No static inline type checking - see Subtlety (1) above */
 #define node_isset_bs(node, nodemask)	test_bit((node), (nodemask).bits)
 

@@ -46,7 +46,7 @@
 
 #define DEV_NAME "BiscuitOS"
 
-/* RAM base address */
+/* BiscuitOS Physical and Virtual space Layout information */
 phys_addr_t BiscuitOS_ram_base;
 phys_addr_t BiscuitOS_ram_size;
 phys_addr_t swapper_pg_dir_bs;
@@ -58,21 +58,15 @@ u32 BiscuitOS_vmalloc_size;
 u32 BiscuitOS_pkmap_size;
 u32 BiscuitOS_fixmap_size;
 
-/* Untouched command line (eg. for /proc) saved by arch-specific code. */
-char saved_command_line_bs[COMMAND_LINE_SIZE];
 /* Emulate Kernel image */
 unsigned long _stext_bs, _end_bs;
 /* Command line from DTS */
-const char cmdline_dts[COMMAND_LINE_SIZE];
-/* init mem */
-extern struct mm_struct init_mm;
-struct mm_struct_bs init_mm_bs;
+const char cmdline_dts[COMMAND_LINE_SIZE_BS];
 /* FIXME: TLB information: From ARMv7 Hard-Code */
 unsigned long BiscuitOS_tlb_flags = 0xd0091010;
 
 extern unsigned long phys_initrd_start_bs;
 extern unsigned long phys_initrd_size_bs;
-extern void *high_memory_bs;
 extern asmlinkage void __init start_kernel_bs(void);
 
 static int BiscuitOS_memory_probe(struct platform_device *pdev)
@@ -162,10 +156,20 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 
 	/* Calculate memory map */
 	sprintf((char *)cmdline_dts, 
+#ifndef CONFIG_HIGHMEM_BS
 		"mem_bs=%#lx@%#lx", 
 		(unsigned long)BiscuitOS_dma_size + BiscuitOS_normal_size,
 		(unsigned long)BiscuitOS_ram_base);
-	printk("CMDLINE: [%s]\n", cmdline_dts);
+#else
+		"mem_bs=%#lx@%#lx highmem_bs=%#lx@%#lx", 
+		(unsigned long)BiscuitOS_dma_size + BiscuitOS_normal_size,
+		(unsigned long)BiscuitOS_ram_base,
+		(unsigned long)BiscuitOS_high_size,
+		(unsigned long)(BiscuitOS_ram_base +
+				BiscuitOS_dma_size + BiscuitOS_normal_size));
+#endif
+
+
 
 	/* Obtain kernel image information */
 	ret = of_property_read_u32_array(mem, "kernel-image", array, 2);
@@ -185,9 +189,6 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 	}
 	phys_initrd_start_bs = array[0];
 	phys_initrd_size_bs = array[1];
-
-	/* swapper_pg_dir and init_mm */
-	init_mm_bs.pgd = (pgd_t_bs *)init_mm.pgd;
 
 	start_kernel_bs();
 
