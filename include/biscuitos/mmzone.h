@@ -272,4 +272,41 @@ static inline int is_highmem_idx_bs(int idx)
 
 extern void __init build_all_zonelists_bs(void);
 
+/*
+ * next_zone - helper magic for for_each_zone()
+ * Thanks to William Lee Irwin III for this piece of ingenuity.
+ */
+static inline struct zone_bs *next_zone_bs(struct zone_bs *zone)
+{
+	pg_data_t_bs *pgdat = zone->zone_pgdat;
+
+	if (zone < pgdat->node_zones + MAX_NR_ZONES_BS - 1)
+		zone++;
+	else if (pgdat->pgdat_next) {
+		pgdat = pgdat->pgdat_next;
+		zone = pgdat->node_zones;
+	} else
+		zone = NULL;
+
+	return zone;
+}
+
+/**
+ * for_each_zone - helper macro to iterate over all memory zones
+ * @zone - pointer to struct zone variable
+ *
+ * The user only needs to declare the zone variable, for_each_zone
+ * fills it in. This basically means for_each_zone() is an
+ * easier to read version of this piece of code:
+ *      
+ * for (pgdat = pgdat_list; pgdat; pgdat = pgdat->node_next)
+ *      for (i = 0; i < MAX_NR_ZONES; ++i) {
+ *              struct zone * z = pgdat->node_zones + i;
+ *              ...
+ *      }
+ * }
+ */
+#define for_each_zone_bs(zone)	\
+	for (zone = pgdat_list_bs->node_zones; zone; zone = next_zone_bs(zone))
+
 #endif

@@ -58,8 +58,6 @@ u32 BiscuitOS_vmalloc_size;
 u32 BiscuitOS_pkmap_size;
 u32 BiscuitOS_fixmap_size;
 
-/* Emulate Kernel image */
-unsigned long _stext_bs, _end_bs;
 /* Command line from DTS */
 const char cmdline_dts[COMMAND_LINE_SIZE_BS];
 /* FIXME: TLB information: From ARMv7 Hard-Code */
@@ -69,12 +67,18 @@ extern unsigned long phys_initrd_start_bs;
 extern unsigned long phys_initrd_size_bs;
 extern asmlinkage void __init start_kernel_bs(void);
 
+/* BiscuitOS Running Memory */
+unsigned long _stext_bs, _end_bs;
+unsigned long _etext_bs, _text_bs;
+unsigned long __init_end_bs, __init_begin_bs;
+unsigned long __data_start_bs, _edata_bs;
+
 static int BiscuitOS_memory_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *mem;
 	const phandle *ph;
-	u32 array[2];
+	u32 array[8];
 	int ret;
 
 	/* Find memory node by phandle */
@@ -172,14 +176,21 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 
 
 	/* Obtain kernel image information */
-	ret = of_property_read_u32_array(mem, "kernel-image", array, 2);
+	ret = of_property_read_u32_array(mem, "kernel-image", array, 8);
 	if (ret) {
 		printk("Unable to read BiscuitOS kernel image.\n");
 		return -EINVAL;
 	}
+	/* Running setup */
 	_stext_bs = array[0];
-	_end_bs  = array[0] + array[1];
-	swapper_pg_dir_bs = _stext_bs - 0x4000;
+	_end_bs = array[0] + array[1];
+	__init_begin_bs = array[2];
+	__init_end_bs = array[2] + array[3];
+	_text_bs = array[4];
+	_etext_bs = array[4] + array[5];
+	__data_start_bs = array[6];
+	_edata_bs = array[6] + array[7];
+	swapper_pg_dir_bs = array[0] - 0x4000;
 
 	/* Obtain initrd information */
 	ret = of_property_read_u32_array(mem, "initrd", array, 2);

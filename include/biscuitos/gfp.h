@@ -33,4 +33,12 @@
 #define __GFP_ZERO_BS		0x8000u	/* Return zeroed page on success */
 #define __GFP_NOMEMALLOC_BS	0x10000u /* Don't use emergency reserves */
 
+extern void __free_pages_bs(struct page_bs *page, unsigned int order);
+
+#define __free_page_bs(page)	__free_pages_bs((page), 0)
+
+#ifndef HAVE_ARCH_FREE_PAGE_BS
+static inline void arch_free_page_bs(struct page_bs *page, int order) { }
+#endif
+
 #endif

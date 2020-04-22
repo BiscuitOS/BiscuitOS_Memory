@@ -52,4 +52,6 @@ extern void * __init __alloc_bootmem_node_bs(pg_data_t_bs *,
 #define alloc_bootmem_low_pages_bs(x) \
 	__alloc_bootmem_bs((x), PAGE_SIZE_BS, 0)
 
+extern unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat);
+
 #endif

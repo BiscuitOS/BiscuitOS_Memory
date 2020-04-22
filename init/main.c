@@ -61,4 +61,6 @@ asmlinkage void __init start_kernel_bs(void)
 	build_all_zonelists_bs();
 	page_alloc_init_bs();
 	printk(KERN_NOTICE "Kernel command line: %s\n", saved_command_line_bs);
+
+	mem_init_bs();
 }

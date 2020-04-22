@@ -1,0 +1,6 @@
+#ifndef _BISCUITOS_MMAN_H
+#define _BISCUITOS_MMAN_H
+
+#define OVERCOMMIT_ALWAYS_BS		1
+
+#endif

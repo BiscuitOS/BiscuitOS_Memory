@@ -15,6 +15,8 @@
 #include "biscuitos/bootmem.h"
 #include "biscuitos/nodemask.h"
 #include "biscuitos/mmzone.h"
+#include "biscuitos/swap.h"
+#include "biscuitos/mman.h"
 #include "asm-generated/setup.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
@@ -24,8 +26,8 @@
 #include "asm-generated/cacheflush.h"
 
 /* BiscuitOS Emulate */
-extern unsigned long _stext_bs;
-extern unsigned long _end_bs;
+extern unsigned long _stext_bs, _etext_bs, __init_begin_bs, _text_bs;
+extern unsigned long _end_bs, __init_end_bs, __data_start_bs;
 
 unsigned long phys_initrd_start_bs __initdata = 0;
 unsigned long phys_initrd_size_bs __initdata = 0;
@@ -112,6 +114,13 @@ find_memend_and_nodes_bs(struct meminfo *mi, struct node_info *np)
 		if (memend_pfn < end)
 			memend_pfn = end;
 	}
+
+#ifdef CONFIG_HIGHMEM_BS
+	/* FIXME: Default ARM doesn't support HighMem Zone,
+	 * BiscuitOS support HighMem Zone.
+	 */
+	np[0].end += O_PFN_DOWN(highmeminfo_bs.bank[0].size);
+#endif
 
 	/*
 	 * Calculate the number of pages we requires to
@@ -233,6 +242,14 @@ static inline void free_bootmem_node_bank_bs(int node, struct meminfo *mi)
 		if (mi->bank[bank].node == node)
 			free_bootmem_node_bs(pgdat, mi->bank[bank].start,
 				mi->bank[bank].size);
+
+#ifdef CONFIG_HIGHMEM_BS
+	/* FIXME: Default ARM doesn't support HighMem Zone,
+	 * BiscuitOS support HighMem Zone
+	 */
+	free_bootmem_node_bs(pgdat, highmeminfo_bs.bank[0].start,
+					highmeminfo_bs.bank[0].size);
+#endif
 }
 
 /*
@@ -419,23 +436,6 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 		 */
 		arch_adjust_zones_bs(node, zone_size, zhole_size);
 
-#ifdef CONFIG_HIGHMEM_BS
-		/*
-		 * FIXME: Default ARM doesn't support HighMem ZONE,
-		 * But BiscuitOS support Highmem ZONE on ARM.
-		 */
-		for (i = 0; i < highmeminfo_bs.nr_banks; i++) {
-			zone_size[2] += 
-				highmeminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
-			zhole_size[2] = zone_size[2];
-			if (highmeminfo_bs.bank[i].node != node)
-				continue;
-
-			zhole_size[2] -= 
-				highmeminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
-		}
-#endif
-
 		free_area_init_node_bs(node, pgdat, zone_size,
 			bdata->node_boot_start >> PAGE_SHIFT_BS, zhole_size);
 	}
@@ -447,4 +447,73 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
 	empty_zero_page_bs = virt_to_page_bs(zero_page);
 	/* FIXME: ignore? */
 	flush_dcache_page_bs(empty_zero_page_bs);
+}
+
+/*
+ * mem_init() marks the free areas in the mem_map and tells us how much
+ * memory is free. This is done after various parts of the system have
+ * claimed their memory after the kernel image.
+ */
+void __init mem_init_bs(void)
+{
+	unsigned int codepages, datapages, initpages;
+	int i, node;
+
+	codepages = _etext_bs - _text_bs;
+	datapages = _end_bs - __data_start_bs;
+	initpages = __init_end_bs - __init_begin_bs;
+
+	max_mapnr_bs = virt_to_page_bs(high_memory_bs) - mem_map_bs;
+
+	/*
+	 * We may have non-contiguous memory
+	 */
+	if (meminfo_bs.nr_banks != 1)
+		create_memmap_holes_bs(&meminfo_bs);
+
+	/* this will put all unused low memory onto the freelists */
+	for_each_online_node_bs(node) {
+		pg_data_t_bs *pgdat = NODE_DATA_BS(node);
+
+		if (pgdat->node_spanned_pages != 0)
+			totalram_pages_bs += free_all_bootmem_node_bs(pgdat);
+	}
+
+	/*
+	 * Since our memory may not be contiguous, calculate the
+	 * real number of pages we have in this system
+	 */
+	printk(KERN_INFO "Memory:");
+
+	num_physpages_bs = 0;
+	for (i = 0; i < meminfo_bs.nr_banks; i++) {
+		num_physpages_bs +=
+				meminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
+		printk(" %ldMB", meminfo_bs.bank[i].size >> 20);
+	}
+#ifdef CONFIG_HIGHMEM_BS
+	for (i = 0; i < highmeminfo_bs.nr_banks; i++) {
+		num_physpages_bs += 
+				highmeminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
+		printk(" %ldMB", highmeminfo_bs.bank[i].size >> 20);
+	}
+#endif
+
+	printk(" = %luMB total\n", num_physpages_bs >> (20 - PAGE_SHIFT_BS));
+	printk(KERN_NOTICE "Memory: %luKB available (%dK code, "
+			"%dK data, %dK init)\n",
+		(unsigned long)nr_free_pages_bs() << (PAGE_SHIFT_BS-10),
+		codepages >> 10, datapages >> 10, initpages >> 10);
+
+	if (PAGE_SIZE_BS > 16364 && num_physpages_bs <= 128) {
+		extern int sysctl_overcommit_memory;
+
+		/*
+		 * On a machine this small we won't get
+		 * anywhere without overcommit, so turn
+		 * it on by default.
+		*/
+		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS_BS;
+
+	}
 }

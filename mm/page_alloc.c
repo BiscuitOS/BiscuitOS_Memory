@@ -8,12 +8,15 @@
  * published by the Free Software Foundation.
  */
 #include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/smp.h>
 #include "biscuitos/kernel.h"
 #include "biscuitos/nodemask.h"
 #include "biscuitos/mmzone.h"
 #include "biscuitos/bootmem.h"
 #include "biscuitos/mm.h"
 #include "biscuitos/page-flags.h"
+#include "asm-generated/percpu.h"
 
 nodemask_t_bs node_online_map_bs = { { [0] = 1UL } };
 
@@ -31,8 +34,17 @@ struct pglist_data_bs *pgdat_list_bs;
 struct zone_bs *zone_table_bs[1 << (ZONES_SHIFT_BS + NODES_SHIFT_BS)];
 EXPORT_SYMBOL_GPL(zone_table_bs);
 
+/*
+ * Accumulate the page_state information across all CPUs.
+ * The result is unavoidably approximate - it can change
+ * during and after execution of this function.
+ */
+static DEFINE_PER_CPU_BS(struct page_state_bs, page_states_bs) = {0};
+
 unsigned long __initdata nr_kernel_pages_bs;
 unsigned long __initdata nr_all_pages_bs;
+unsigned long totalram_pages_bs;
+unsigned long totalhigh_pages_bs;
 
 static char *zone_names_bs[MAX_NR_ZONES_BS] = { "DMA", "Normal", "HighMem" };
 
@@ -379,3 +391,345 @@ void __init build_all_zonelists_bs(void)
 		build_zonelists_bs(NODE_DATA_BS(i));
 	printk("Build %i zonelists\n", num_online_nodes_bs());
 }
+
+void set_page_refs_bs(struct page_bs *page, int order)
+{
+#ifdef CONFIG_MMU
+	set_page_count_bs(page, 1);
+#else
+	int i;                          
+                        
+	/*              
+	 * We need to reference all the pages for this order, otherwise if
+	 * anyone accesses one of the pages with (get/put) it will be freed.
+	 * - eg: access_process_vm()
+	 */     
+	for (i = 0; i < (1 << order); i++)
+		set_page_count_bs(page + i, 1);
+#endif
+}
+
+/*
+ * Temporary debugging check for pages not lying within a given zone.
+ */
+static int bad_range_bs(struct zone_bs *zone, struct page_bs *page)
+{
+	if (page_to_pfn_bs(page) >= 
+				zone->zone_start_pfn + zone->spanned_pages)
+		return 1;
+	if (page_to_pfn_bs(page) < zone->zone_start_pfn)
+		return 1;
+#ifdef CONFIG_HOLES_IN_ZONE
+	if (!pfn_valid_bs(page_to_pfn_bs(page)))
+		return 1;
+#endif
+	if (zone != page_zone_bs(page))
+		return 1;
+	return 0;
+}
+
+void __mod_page_state_bs(unsigned offset, unsigned long delta)
+{
+	unsigned long flags;
+	void *ptr;
+
+	local_irq_save(flags);
+	ptr = &__get_cpu_var_bs(page_states_bs);
+	*(unsigned long *)(ptr + offset) += delta;
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL_GPL(__mod_page_state_bs);
+
+static void bad_page_bs(const char *function, struct page_bs *page)
+{
+	printk(KERN_EMERG "Bad page state at %s (in process '%s', page %p)\n",
+			function, current->comm, page);
+	printk(KERN_EMERG "flags:0x%0*lx mapping:%p mapcount:%d count:%d\n",
+			(int)(2*sizeof(page_flags_t_bs)), 
+			(unsigned long)page->flags,
+			page->mapping,
+			page_mapcount_bs(page),
+			page_count_bs(page));
+	printk(KERN_EMERG "BiscuitOS Backtrace:\n");
+	dump_stack();
+	printk(KERN_EMERG "Trying to fix it up, but a reboot is needed\n");
+	page->flags &= ~(1 << PG_private_bs		|
+			1 << PG_locked_bs		|
+			1 << PG_lru_bs			|
+			1 << PG_active_bs		|
+			1 << PG_dirty_bs		|
+			1 << PG_swapcache_bs		|
+			1 << PG_writeback_bs);
+	set_page_count_bs(page, 0);
+	reset_page_mapcount_bs(page);
+	page->mapping = NULL;
+}
+
+static inline void free_pages_check_bs(const char *function,
+						struct page_bs *page)
+{
+	if (	page_mapcount_bs(page) ||
+		page->mapping != NULL ||
+		page_count_bs(page) != 0 ||
+		(page->flags & (
+			1 << PG_lru_bs		|
+			1 << PG_private_bs	|
+			1 << PG_locked_bs	|
+			1 << PG_active_bs	|
+			1 << PG_reclaim_bs	|
+			1 << PG_slab_bs		|
+			1 << PG_swapcache_bs	|
+			1 << PG_writeback_bs	)))
+		bad_page_bs(function, page);
+	if (PageDirty_bs(page))
+		ClearPageDirty_bs(page);
+}
+
+#ifndef CONFIG_HUGETLB_PAGE_BS
+#define destroy_compound_page_bs(page, order)	do {} while (0)
+#endif
+
+/*
+ * function for dealing with page's order in buddy system.
+ * zone->lock is already acquired when we use these.
+ * So, we don't need atomic page->flags operations here.
+ */
+static inline unsigned long page_order_bs(struct page_bs *page)
+{
+	return page->private;
+}
+
+static inline void set_page_order_bs(struct page_bs *page, int order)
+{
+	page->private = order;
+	__SetPagePrivate_bs(page);
+}
+
+static inline void rmv_page_order_bs(struct page_bs *page)
+{
+	__ClearPagePrivate_bs(page);
+	page->private = 0;
+}
+
+/*
+ * This function checks whether a page is free && is the buddy
+ * we can do coalesce a page and its buddy if
+ * (a) the buddy is free &&
+ * (b) the buddy is on the buddy system &&
+ * (c) a page and its buddy have the same order.
+ * for recording page's order, we use page->private and PG_private.
+ *
+ */
+static inline int page_is_buddy_bs(struct page_bs *page, int order)
+{
+	if (PagePrivate_bs(page)		&&
+	   (page_order_bs(page) == order)	&&
+	   !PageReserved_bs(page)		&&
+	   page_count_bs(page) == 0)
+		return 1;
+	return 0;
+}
+
+/*
+ * Locate the struct page for both the matching buddy in our
+ * pair (buddy1) and the combined O(n+1) page they form (page).
+ *
+ * 1) Any buddy B1 will have an order O twin B2 which satisfies
+ * the following equation:
+ *     B2 = B1 ^ (1 << O)
+ * For example, if the starting buddy (buddy2) is #8 its order
+ * 1 buddy is #10:
+ *     B2 = 8 ^ (1 << 1) = 8 ^ 2 = 10
+ *
+ * 2) Any buddy B will have an order O+1 parent P which
+ * satisfies the following equation:
+ *     P = B & ~(1 << O)
+ *
+ * Assumption: *_mem_map is contigious at least up to MAX_ORDER
+ */
+static inline struct page_bs *
+__page_find_buddy_bs(struct page_bs *page, unsigned long page_idx, 
+							unsigned int order)
+{
+	unsigned long buddy_idx = page_idx ^ (1 << order);
+
+	return page + (buddy_idx - page_idx);
+}
+
+static inline unsigned long
+__find_combined_index_bs(unsigned long page_idx, unsigned int order)
+{
+	return (page_idx & ~(1 << order));
+}
+
+/*
+ * Freeing function for a buddy system allocator.
+ *
+ * The concept of a buddy system is to maintain direct-mapped table
+ * (containing bit values) for memory blocks of various "orders".
+ * The bottom level table contains the map for the smallest allocatable
+ * units of memory (here, pages), and each level above it describes
+ * pairs of units from the levels below, hence, "buddies".
+ * At a high level, all that happens here is marking the table entry
+ * at the bottom level available, and propagating the changes upward
+ * as necessary, plus some accounting needed to play nicely with other
+ * parts of the VM system.
+ * At each level, we keep a list of pages, which are heads of continuous
+ * free pages of length of (1 << order) and marked with PG_Private.Page's
+ * order is recorded in page->private field.
+ * So when we are allocating or freeing one, we can derive the state of the
+ * other.  That is, if we allocate a small block, and both were   
+ * free, the remainder of the region must be split into blocks.   
+ * If a block is freed, and its buddy is also free, then this
+ * triggers coalescing into a block of larger size.            
+ *
+ * -- wli
+ */
+
+static inline void __free_pages_bulk_bs(struct page_bs *page,
+		struct zone_bs *zone, unsigned int order)
+{
+	unsigned long page_idx;
+	int order_size = 1 << order;
+
+	if (unlikely(order))
+		destroy_compound_page_bs(page, order);
+
+	page_idx = page_to_pfn_bs(page) & ((1 << MAX_ORDER_BS) - 1);
+
+	BUG_ON_BS(page_idx & (order_size - 1));
+	BUG_ON_BS(bad_range_bs(zone, page));
+
+	zone->free_pages += order_size;
+	while (order < MAX_ORDER_BS-1) {
+		unsigned long combined_idx;
+		struct free_area_bs *area;
+		struct page_bs *buddy;
+
+		combined_idx = __find_combined_index_bs(page_idx, order);
+		buddy = __page_find_buddy_bs(page, page_idx, order);
+
+		if (bad_range_bs(zone, buddy))
+			break;
+		if (!page_is_buddy_bs(buddy, order))
+			break;	/* Move the buddy up one level */
+		list_del(&buddy->lru);
+		area = zone->free_area + order;
+		area->nr_free--;
+		rmv_page_order_bs(buddy);
+		page = page + (combined_idx - page_idx);
+		page_idx = combined_idx;
+		order++;
+	}
+	set_page_order_bs(page, order);
+	list_add(&page->lru, &zone->free_area[order].free_list);
+	zone->free_area[order].nr_free++;
+}
+
+/*
+ * Frees a list of pages. 
+ * Assumes all pages on list are in same zone, and of same order.
+ * count is the number of pages to free, or 0 for all on the list.
+ *
+ * If the zone was previously in an "all pages pinned" state then look to
+ * see if this freeing clears that state.
+ *
+ * And clear the zone's pages_scanned counter, to hold off the "all pages are
+ * pinned" detection logic.
+ */
+static int
+free_pages_bulk_bs(struct zone_bs *zone, int count,
+                        struct list_head *list, unsigned int order)
+{
+	unsigned long flags; 
+	struct page_bs *page = NULL;
+	int ret = 0;
+
+	spin_lock_irqsave(&zone->lock, flags);
+	zone->all_unreclaimable = 0;
+	zone->pages_scanned = 0; 
+	while (!list_empty(list) && count--) {
+		page = list_entry(list->prev, struct page_bs, lru);
+		/* have to delete it as _free_pages_bulk_bs list manipulates */
+		list_del(&page->lru);
+		__free_pages_bulk_bs(page, zone, order);
+		ret++;
+	}
+	spin_unlock_irqrestore(&zone->lock, flags);
+	return ret;
+}
+
+void __free_pages_ok_bs(struct page_bs *page, unsigned int order)
+{
+	LIST_HEAD(list);
+	int i;
+
+	arch_free_page_bs(page, order);
+
+	mod_page_state_bs(pgfree, 1 << order);
+
+	for (i = 0; i < (1 << order); ++i)
+		free_pages_check_bs(__FUNCTION__, page + i);
+	list_add(&page->lru, &list);
+	kernel_map_pages_bs(page, 1 << order, 0);
+	free_pages_bulk_bs(page_zone_bs(page), 1, &list, order);
+}
+
+/*
+ * Free a 0-order page
+ */
+static void FASTCALL(free_hot_cold_page_bs(struct page_bs *page, int cold));
+static void fastcall free_hot_cold_page_bs(struct page_bs *page, int cold)
+{
+	struct zone_bs *zone = page_zone_bs(page);
+	struct per_cpu_pages_bs *pcp;
+	unsigned long flags;
+
+	arch_free_page_bs(page, 0);
+
+	kernel_map_pages_bs(page, 1, 0);
+	inc_page_state_bs(pgfree);
+	if (PageAnon_bs(page))
+		page->mapping = NULL;
+	free_pages_check_bs(__FUNCTION__, page);
+	pcp = &zone->pageset[get_cpu()].pcp[cold];
+	local_irq_save(flags);
+	if (pcp->count >= pcp->high)
+		pcp->count -= free_pages_bulk_bs(zone, pcp->batch, 
+							&pcp->list, 0);
+	list_add(&page->lru, &pcp->list);
+	pcp->count++;
+	local_irq_restore(flags);
+	put_cpu();
+}
+
+void fastcall free_hot_page_bs(struct page_bs *page)
+{
+	free_hot_cold_page_bs(page, 0);
+}
+
+void __free_pages_bs(struct page_bs *page, unsigned int order)
+{
+	if (!PageReserved_bs(page) && put_page_testzero_bs(page)) {
+		if (order == 0)
+			free_hot_page_bs(page);
+		else
+			__free_pages_ok_bs(page, order);
+	}
+}
+EXPORT_SYMBOL_GPL(__free_pages_bs);
+
+/*
+ * Total amount of free (allocatable) RAM:
+ */
+unsigned int nr_free_pages_bs(void)
+{
+	unsigned int sum = 0;
+	struct zone_bs *zone;
+
+	for_each_zone_bs(zone)
+		sum += zone->free_pages;
+
+	return sum;
+}
+EXPORT_SYMBOL_GPL(nr_free_pages_bs);

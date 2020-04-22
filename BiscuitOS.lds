@@ -22,4 +22,5 @@ SECTIONS {
 			*(.data.percpu_bs)
 		__per_cpu_end_bs = .;
 	}
+	. = ALIGN(16);
 }

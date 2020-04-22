@@ -2,6 +2,7 @@
 #define _BISCUITOS_KERNEL_H
 
 #include "asm-generated/bug.h"
+#include "biscuitos/linkage.h"
 
 #define __unused	__attribute__((__unused__))
 

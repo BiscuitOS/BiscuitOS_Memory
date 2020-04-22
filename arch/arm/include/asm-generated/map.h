@@ -36,5 +36,6 @@ enum {
 };
 
 extern void memtable_init_bs(struct meminfo *);
+extern void __init create_memmap_holes_bs(struct meminfo *mi);
 
 #endif

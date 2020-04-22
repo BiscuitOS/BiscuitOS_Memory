@@ -102,7 +102,10 @@ static inline void *phys_to_virt_bs(unsigned long x)
 
 #define PHYS_RELATIVE(v_data, v_text)	((v_data) - (v_text))
 
+#include "asm-generated/setup.h"
+
 extern u32 BiscuitOS_dma_size;
+extern struct meminfo highmeminfo_bs;
 /*
  * Only first 4MB of memory can be accessed via PCI.
  * We use GFP_DMA to allocate safe buffers to do map/unmap.
@@ -124,6 +127,17 @@ static inline void __arch_adjust_zones_bs(int node,
 	zone_size[0] = sz;
 	zhole_size[1] = zhole_size[0];
 	zhole_size[0] = 0;
+
+#ifdef CONFIG_HIGHMEM_BS
+	/* FIXME: Default ARM doesn't support HighMem Zone,
+	 * BiscuitOS support HighMem Zone.
+	 */
+	zone_size[2] = highmeminfo_bs.bank[0].size >> PAGE_SHIFT_BS;
+	zhole_size[2] = 0;
+	zone_size[1] -= zone_size[2];
+	zhole_size[0] = zhole_size[1] = 0;
+#endif
+
 }
 
 
@@ -131,4 +145,7 @@ static inline void __arch_adjust_zones_bs(int node,
 #define arch_adjust_zones_bs(node,size,holes)	\
 		__arch_adjust_zones_bs(node, size, holes)
 #endif
+
+extern unsigned long max_mapnr_bs;
+
 #endif

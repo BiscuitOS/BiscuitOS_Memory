@@ -13,6 +13,9 @@
 #include "biscuitos/mm.h"
 #include "biscuitos/bootmem.h"
 #include "biscuitos/mmzone.h"
+#include "biscuitos/page-flags.h"
+#include "asm-generated/types.h"
+#include "internal.h"
 
 /*
  * Access to this subsystem has to be serialized externally. (this is
@@ -249,6 +252,82 @@ found:
 	return ret;
 }
 
+static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
+{
+	struct page_bs *page;
+	bootmem_data_t_bs *bdata = pgdat->bdata;
+	unsigned long i, count, total = 0;
+	unsigned long idx;
+	unsigned long *map;
+	int gofast = 0;
+
+	BUG_ON_BS(!bdata->node_bootmem_map);
+
+	count = 0;
+	/* first extant page of the node */
+	page = virt_to_page_bs(phys_to_virt_bs(bdata->node_boot_start));
+	idx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT_BS);
+	map = bdata->node_bootmem_map;
+	/* Check physaddr is O(LOG2(BITS_PER_LONG)) page aligned */
+	if (bdata->node_boot_start == 0 ||
+	    ffs(bdata->node_boot_start) - PAGE_SHIFT > ffs(BITS_PER_LONG_BS))
+		gofast = 1;
+	for (i = 0; i < idx; ) {
+		unsigned long v = ~map[i / BITS_PER_LONG_BS];
+
+		if (gofast && v == ~0UL) {
+			int j, order;
+
+			count += BITS_PER_LONG_BS;
+			__ClearPageReserved_bs(page);
+			order = ffs(BITS_PER_LONG_BS) - 1;
+			set_page_refs_bs(page, order);
+			for (j = 1; j < BITS_PER_LONG_BS; j++) {
+				if (j + 16 < BITS_PER_LONG_BS)
+					prefetchw(page + j + 16);
+				__ClearPageReserved_bs(page + j);
+			}
+			__free_pages_bs(page, order);
+			i += BITS_PER_LONG_BS;
+			page += BITS_PER_LONG_BS;
+		} else if (v) {
+			unsigned long m;
+
+			for (m = 1; m && i < idx; m <<= 1, page++, i++) {
+				if (v & m) {
+					count++;
+					__ClearPageReserved_bs(page);
+					set_page_refs_bs(page, 0);
+					__free_page_bs(page);
+				}
+			}
+		} else {
+			i+= BITS_PER_LONG_BS;
+			page += BITS_PER_LONG_BS;
+		}
+	}
+	total += count;
+
+	/*
+	 * Now free the allocator bitmap itself, it's not
+	 * needed anymore.
+	 */
+	page = virt_to_page_bs(bdata->node_bootmem_map);
+	count = 0;
+	for (i = 0; i < ((bdata->node_low_pfn - (bdata->node_boot_start >>
+			PAGE_SHIFT_BS))/8 + PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
+						i++,page++) {
+		count++;
+		__ClearPageReserved_bs(page);
+		set_page_count_bs(page, 1);
+		__free_page_bs(page);
+	}
+	total += count;
+	bdata->node_bootmem_map = NULL;
+
+	return total;
+}
+
 unsigned long __init
 init_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long freepfn,
 			unsigned long startpfn, unsigned long endpfn)
@@ -296,4 +375,9 @@ void *__init __alloc_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long size,
 		return (ptr);
 
 	return __alloc_bootmem_bs(size, align, goal);
+}
+
+unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat)
+{
+	return (free_all_bootmem_core_bs(pgdat));
 }

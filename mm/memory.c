@@ -19,6 +19,7 @@ EXPORT_SYMBOL_GPL(max_mapnr_bs);
 EXPORT_SYMBOL_GPL(mem_map_bs);
 #endif
 
+unsigned long num_physpages_bs;
 /*
  * A number of key systems in x86 including ioremap() relay on the assumption
  * that high_memory defines the upper bound on direct map memory, then end
@@ -28,3 +29,4 @@ EXPORT_SYMBOL_GPL(mem_map_bs);
  */
 void *high_memory_bs;
 EXPORT_SYMBOL_GPL(high_memory_bs);
+EXPORT_SYMBOL_GPL(num_physpages_bs);
