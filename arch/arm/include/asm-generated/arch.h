@@ -1,7 +1,7 @@
 #ifndef _BISCUITOS_ARM_ARCH_H
 #define _BISCUITOS_ARM_ARCH_H
 
-struct machine_desc {
+struct machine_desc_bs {
 	unsigned int phys_rams;		/* start of physical ram */
 	void (*map_io)(void);
 };

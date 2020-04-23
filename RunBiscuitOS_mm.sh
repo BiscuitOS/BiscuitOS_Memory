@@ -54,7 +54,7 @@ show_trace()
 mount_fs()
 {
 	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1.ko
-	lsmod
+	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1-buddy.ko
 }
 
 umount_fs()

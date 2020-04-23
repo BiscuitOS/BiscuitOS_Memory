@@ -27,7 +27,7 @@
 #define MEM_SIZE	(16*1024*1024)
 #endif
 
-extern void paging_init_bs(struct meminfo *, struct machine_desc *desc);
+extern void paging_init_bs(struct meminfo *, struct machine_desc_bs *desc);
 extern void __init init_default_cache_policy_bs(unsigned long pmd);
 
 /*
@@ -45,7 +45,7 @@ static char __unused default_command_line_bs[COMMAND_LINE_SIZE_BS] __initdata;
 unsigned int processor_id_bs;
 unsigned int cacheid_bs __read_mostly;
 EXPORT_SYMBOL_GPL(cacheid_bs);
-static struct machine_desc default_desc;
+static struct machine_desc_bs default_desc;
 
 static const char *proc_arch_bs[] = {
 	"undefined/unknown",
@@ -308,7 +308,7 @@ static void __init setup_processor_bs(void)
 
 void __init setup_arch_bs(char **cmdline_p)
 {
-	struct machine_desc *mdesc = &default_desc;
+	struct machine_desc_bs *mdesc = &default_desc;
 	/* BiscuitOS doesn't emulate ATAG and KBUILD, both from DTS */
 	char *from = (char *)cmdline_dts;
 

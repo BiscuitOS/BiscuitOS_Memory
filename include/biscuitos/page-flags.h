@@ -92,6 +92,24 @@ struct page_state_bs {
 #define mod_page_state_bs(member, delta)	\
 	__mod_page_state_bs(offsetof(struct page_state_bs, member), (delta))
 
+#define mod_page_state_zone_bs(zone, member, delta)			\
+	do {								\
+		unsigned offset;					\
+									\
+		if (is_highmem_bs(zone)) {				\
+			offset = 					\
+			 offsetof(struct page_state_bs, member##_high);	\
+		} else if (is_normal_bs(zone)) {			\
+			offset =					\
+			 offsetof(struct page_state_bs, member##_normal); \
+		} else {						\
+			offset =					\
+			 offsetof(struct page_state_bs, member##_dma);	\
+		}							\
+		__mod_page_state_bs(offset, (delta));			\
+	 } while (0)
+
+
 #define inc_page_state_bs(member)	mod_page_state_bs(member, 1UL)
 
 #define PageReserved_bs(page)		test_bit(PG_reserved_bs, &(page)->flags)

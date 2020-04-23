@@ -15,6 +15,14 @@ SECTIONS {
 			*(__early_param_bs)
 		__early_end_bs = .;
 	}
+
+	/* bootmem */
+	.bootmem_bs 0 : {
+		__bootmem_start_bs = .;
+			*(.bootmem_data_bs)
+		__bootmem_end_bs = .;
+	}
+
 	. = ALIGN(16);
 	/* percpu */
 	.percpu_bs : {

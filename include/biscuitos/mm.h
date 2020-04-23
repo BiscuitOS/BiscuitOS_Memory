@@ -170,4 +170,6 @@ static inline int page_mapcount_bs(struct page_bs *page)
 	return atomic_read(&(page)->_mapcount) + 1;
 }
 
+extern unsigned long num_physpages_bs;
+
 #endif

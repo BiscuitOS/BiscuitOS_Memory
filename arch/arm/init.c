@@ -17,6 +17,7 @@
 #include "biscuitos/mmzone.h"
 #include "biscuitos/swap.h"
 #include "biscuitos/mman.h"
+#include "biscuitos/init.h"
 #include "asm-generated/setup.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
@@ -291,6 +292,9 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 	struct node_info node_info[MAX_NUMNODES_BS], *np = node_info;
 	unsigned int bootmap_pages, bootmap_pfn, map_pg;
 	int node, initrd_node;
+	/* bootmem debug entry (not default) */
+	bootmem_entry_t_bs *call;
+	extern bootmem_entry_t_bs __bootmem_start_bs[], __bootmem_end_bs[];
 
 	bootmap_pages = find_memend_and_nodes_bs(mi, np);
 	bootmap_pfn   = find_bootmap_pfn_bs(0, mi, bootmap_pages);
@@ -353,13 +357,18 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 	}
 
 	BUG_ON_BS(map_pg != bootmap_pfn + bootmap_pages);
+
+	/* FIXME: bootmem_initcall entry, used to debug bootmem,
+	 * This code isn't default code */
+	for (call = __bootmem_start_bs; call < __bootmem_end_bs; call++)
+		(*call)();	
 }
 
 /*
  * paging_init() sets up the page tables, initializes the zone memory
  * maps, and sets up the zero page, bad page and page table.
  */
-void __init paging_init_bs(struct meminfo *mi, struct machine_desc *mdesc)
+void __init paging_init_bs(struct meminfo *mi, struct machine_desc_bs *mdesc)
 {
 	void *zero_page;
 	int node;

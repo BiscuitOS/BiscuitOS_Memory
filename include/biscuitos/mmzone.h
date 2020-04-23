@@ -252,6 +252,11 @@ extern struct pglist_data_bs *pgdat_list_bs;
 #define MAX_ZONES_SHIFT_BS	2
 
 /*
+ * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc
+ */
+#define zone_idx_bs(zone)	((zone - (zone)->zone_pgdat->node_zones))
+
+/*
  * for_each_pgdat - helper macro to iterate over all nodes
  * @pgdat - pointer to a pg_data_t variable
  *
@@ -268,6 +273,27 @@ extern struct pglist_data_bs *pgdat_list_bs;
 static inline int is_highmem_idx_bs(int idx)
 {
 	return (idx == ZONE_HIGHMEM_BS);
+}
+
+static inline int is_normal_idx_bs(int idx)
+{
+	return (idx == ZONE_NORMAL_BS);
+}
+
+/**
+ * is_highmem - helper function to quickly check if a struct zone is a 
+ *              highmem zone or not.  This is an attempt to keep references
+ *              to ZONE_{DMA/NORMAL/HIGHMEM/etc} in general code to a minimum.
+ * @zone - pointer to struct zone variable
+ */
+static inline int is_highmem_bs(struct zone_bs *zone)
+{
+	return zone == zone->zone_pgdat->node_zones + ZONE_HIGHMEM_BS;
+}
+
+static inline int is_normal_bs(struct zone_bs *zone)
+{
+	return zone == zone->zone_pgdat->node_zones + ZONE_NORMAL_BS;
 }
 
 extern void __init build_all_zonelists_bs(void);
@@ -308,5 +334,7 @@ static inline struct zone_bs *next_zone_bs(struct zone_bs *zone)
  */
 #define for_each_zone_bs(zone)	\
 	for (zone = pgdat_list_bs->node_zones; zone; zone = next_zone_bs(zone))
+
+#define numa_node_id_bs()	(0)
 
 #endif

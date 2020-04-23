@@ -15,7 +15,10 @@
 #include "biscuitos/mmzone.h"
 #include "biscuitos/bootmem.h"
 #include "biscuitos/mm.h"
+#include "biscuitos/swap.h"
+#include "biscuitos/cpuset.h"
 #include "biscuitos/page-flags.h"
+#include "biscuitos/sched.h"
 #include "asm-generated/percpu.h"
 
 nodemask_t_bs node_online_map_bs = { { [0] = 1UL } };
@@ -486,7 +489,8 @@ static inline void free_pages_check_bs(const char *function,
 }
 
 #ifndef CONFIG_HUGETLB_PAGE_BS
-#define destroy_compound_page_bs(page, order)	do {} while (0)
+#define prep_compound_page_bs(page, order)	do { } while (0)
+#define destroy_compound_page_bs(page, order)	do { } while (0)
 #endif
 
 /*
@@ -678,8 +682,8 @@ void __free_pages_ok_bs(struct page_bs *page, unsigned int order)
 /*
  * Free a 0-order page
  */
-static void FASTCALL(free_hot_cold_page_bs(struct page_bs *page, int cold));
-static void fastcall free_hot_cold_page_bs(struct page_bs *page, int cold)
+static void FASTCALL_BS(free_hot_cold_page_bs(struct page_bs *page, int cold));
+static void fastcall_bs free_hot_cold_page_bs(struct page_bs *page, int cold)
 {
 	struct zone_bs *zone = page_zone_bs(page);
 	struct per_cpu_pages_bs *pcp;
@@ -703,7 +707,7 @@ static void fastcall free_hot_cold_page_bs(struct page_bs *page, int cold)
 	put_cpu();
 }
 
-void fastcall free_hot_page_bs(struct page_bs *page)
+void fastcall_bs free_hot_page_bs(struct page_bs *page)
 {
 	free_hot_cold_page_bs(page, 0);
 }
@@ -733,3 +737,276 @@ unsigned int nr_free_pages_bs(void)
 	return sum;
 }
 EXPORT_SYMBOL_GPL(nr_free_pages_bs);
+
+/*
+ * Return 1 if free pages are above 'mark'. This takes into account the order
+ * of the allocation.
+ */
+int zone_watermark_ok_bs(struct zone_bs *z, int order, unsigned long mark,
+		int classzone_idx, int can_try_harder, int gfp_high)
+{
+	/* free_pages my go negative - that's OK */
+	long min = mark, free_pages = z->free_pages - (1 << order) + 1;
+	int o;
+
+	if (gfp_high)
+		min  -= min / 2;
+	if (can_try_harder)
+		min -= min / 4;
+
+	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
+		return 0;
+
+	for (o = 0; o < order; o++) {
+		/* At the next order, this order's pages become unavailable */
+		free_pages -= z->free_area[o].nr_free << o;
+
+		/* Require fewer higher order pages to be free */
+		min >>= 1;
+
+		if (free_pages <= min)
+			return 0;
+	}
+	return 1;
+}
+
+/*
+ * The order of subdivision here is critical for the IO subsystem.
+ * Please do not alter this order without good reasons and regression
+ * testing. Specifically, as large blocks of memory are subdivided,
+ * the order in which smaller blocks are delivered depends on the order
+ * they're subdivided in this function. This is the primary factor
+ * influencing the order in which pages are delivered to the IO
+ * subsystem according to empirical testing, and this is also justified
+ * by considering the behavior of a buddy system containing a single
+ * large block of memory acted on by a series of small allocations.
+ * This behavior is a critical factor in sglist merging's success.
+ *
+ * -- wli
+ */
+static inline struct page_bs *
+expand_bs(struct zone_bs *zone, struct page_bs *page,
+		int low, int high, struct free_area_bs *area)
+{
+	unsigned long size = 1 << high;
+
+	while (high > low) {
+		area--;
+		high--;
+		size >>= 1;
+		BUG_ON_BS(bad_range_bs(zone, &page[size]));
+		list_add(&page[size].lru, &area->free_list);
+		area->nr_free++;
+		set_page_order_bs(&page[size], high);
+	}
+	return page;
+}
+
+/* 
+ * Do the hard work of removing an element from the buddy allocator.
+ * Call me with the zone->lock already held.
+ */
+static struct page_bs *__rmqueue_bs(struct zone_bs *zone, unsigned int order)
+{
+	struct free_area_bs *area;
+	unsigned int current_order;
+	struct page_bs *page;
+
+	for (current_order = order; current_order < MAX_ORDER_BS; 
+							++current_order) {
+		area = zone->free_area + current_order;
+		if (list_empty(&area->free_list))
+			continue;
+
+		page = list_entry(area->free_list.next, struct page_bs, lru);
+		list_del(&page->lru);
+		rmv_page_order_bs(page);
+		area->nr_free--;
+		zone->free_pages -= 1UL << order;
+		return expand_bs(zone, page, order, current_order, area);
+	}
+	return NULL;
+}
+
+/* 
+ * Obtain a specified number of elements from the buddy allocator, all under
+ * a single hold of the lock, for efficiency.  Add them to the supplied list.
+ * Returns the number of new pages which were placed at *list.
+ */
+static int rmqueue_bulk_bs(struct zone_bs *zone, unsigned int order,
+		unsigned long count, struct list_head *list)
+{
+	unsigned long flags;
+	int i;
+	int allocated = 0;
+	struct page_bs *page;
+
+	spin_lock_irqsave(&zone->lock, flags);
+	for (i = 0; i < count; ++i) {
+		page = __rmqueue_bs(zone, order);
+		if (page == NULL)
+			break;
+		allocated++;
+		list_add_tail(&page->lru, list);
+	}
+	spin_unlock_irqrestore(&zone->lock, flags);
+	return allocated;
+}
+
+/*
+ * This page is about to be returned from the apge allocator
+ */
+static void prep_new_page_bs(struct page_bs *page, int order)
+{
+	if (page->mapping || page_mapcount_bs(page) ||
+	   (page->flags & (
+			1 << PG_private_bs	|
+			1 << PG_locked_bs	|
+			1 << PG_lru_bs		|
+			1 << PG_active_bs	|
+			1 << PG_dirty_bs	|
+			1 << PG_reclaim_bs	|
+			1 << PG_swapcache_bs	|
+			1 << PG_writeback_bs)))
+		bad_page_bs(__FUNCTION__, page);
+
+	page->flags &= ~(1 << PG_uptodate_bs | 1 << PG_error_bs |
+			 1 << PG_referenced_bs | 1 << PG_arch_1_bs |
+			 1 << PG_checked_bs | 1 << PG_mappedtodisk_bs);
+	page->private = 0;
+	set_page_refs_bs(page, order);
+	kernel_map_pages_bs(page, 1 << order, 1);
+}
+
+static inline void prep_zero_page_bs(struct page_bs *page, int order,
+			unsigned int __nocast gfp_flags)
+{
+	int i;
+
+	BUG_ON_BS((gfp_flags & (__GFP_WAIT_BS | __GFP_HIGHMEM_BS)) == 
+							__GFP_HIGHMEM_BS);
+	for (i = 0; i < (1 << order); i++)
+		BS_DUP();
+}
+
+/*
+ * Really, prep_compound_page() should be called from __rmqueue_bulk().  But
+ * we cheat by calling it from here, in the order > 0 path.  Saves a branch
+ * or two.
+ */
+static struct page_bs *
+buffered_rmqueue_bs(struct zone_bs *zone, int order, 
+				unsigned int __nocast gfp_flags)
+{
+	unsigned long flags;
+	struct page_bs *page = NULL;
+	int cold = !!(gfp_flags & __GFP_COLD_BS);
+
+	if (order == 0) {
+		struct per_cpu_pages_bs *pcp;
+
+		pcp = &zone->pageset[get_cpu()].pcp[cold];
+		local_irq_save(flags);
+		if (pcp->count >= pcp->low)
+			pcp->count += rmqueue_bulk_bs(zone, 0,
+				pcp->batch, &pcp->list);
+		if (pcp->count) {
+			page = list_entry(pcp->list.next, struct page_bs, lru);
+			list_del(&page->lru);
+			pcp->count--;
+		}
+		local_irq_restore(flags);
+		put_cpu();
+	}
+
+	if (page == NULL) {
+		spin_lock_irqsave(&zone->lock, flags);
+		page = __rmqueue_bs(zone, order);
+		spin_unlock_irqrestore(&zone->lock, flags);
+	}
+
+	if (page != NULL) {
+		BUG_ON_BS(bad_range_bs(zone, page));
+		mod_page_state_zone_bs(zone, pgalloc, 1 << order);
+		prep_new_page_bs(page, order);
+
+		if (gfp_flags & __GFP_ZERO_BS)
+			prep_zero_page_bs(page, order, gfp_flags);
+
+		if (order && (gfp_flags & __GFP_COMP_BS))
+			prep_compound_page_bs(page, order);
+	}
+	return page;
+}
+
+static void zone_statistics_bs(struct zonelist_bs *zonelist, 
+						struct zone_bs *z)
+{
+}
+
+/*
+ * This is the 'heart' of the zoned buddy allocator.
+ */
+struct page_bs *fastcall_bs
+__alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
+		struct zonelist_bs *zonelist)
+{
+	const int wait = gfp_mask & __GFP_WAIT_BS;
+	struct zone_bs **zones, *z;
+	struct page_bs *page;
+	struct reclaim_state_bs reclaim_state;
+	struct task_struct *p = current;
+	int i;
+	int classzone_idx;
+	int do_retry;
+	int can_try_harder;
+	int did_some_progress;
+
+	might_sleep_if(wait);
+
+	/*
+	 * The caller may dip into page reserves a bit more if the caller
+	 * cannot run direct reclaim, or is the caller has realtime scheduling
+	 * policy.
+	 */
+	can_try_harder = (unlikely(rt_task_bs(p)) && !in_interrupt()) || !wait;
+
+	zones = zonelist->zones; /* the list of zones suitable for gfp_mask */
+
+	if (unlikely(zones[0] == NULL)) {
+		/* Should this ever happen?? */
+		return NULL;
+	}
+
+	classzone_idx = zone_idx_bs(zones[0]);
+
+restart:
+	/* Go through the zonelist once, looking for a zone with enough free */
+	for (i = 0; (z = zones[i]) != NULL; i++) {
+		if (!zone_watermark_ok_bs(z, order, z->pages_low,
+					classzone_idx, 0, 0))
+			continue;
+
+		if (wait && !cpuset_zone_allowed_bs(z))
+			continue;
+
+		page = buffered_rmqueue_bs(z, order, gfp_mask);
+		if (page)
+			goto got_pg;
+	}
+
+	BS_DUP();
+got_pg:
+	zone_statistics_bs(zonelist, z);
+	return page;
+}
+EXPORT_SYMBOL_GPL(__alloc_pages_bs);
+
+fastcall_bs void free_pages_bs(unsigned long addr, unsigned int order)
+{
+	if (addr != 0) {
+		BUG_ON_BS(!virt_addr_valid_bs((void *)addr));
+		__free_pages_bs(virt_to_page_bs((void *)addr), order);
+	}
+}
+EXPORT_SYMBOL_GPL(free_pages_bs);

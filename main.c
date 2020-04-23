@@ -58,6 +58,12 @@ u32 BiscuitOS_vmalloc_size;
 u32 BiscuitOS_pkmap_size;
 u32 BiscuitOS_fixmap_size;
 
+EXPORT_SYMBOL_GPL(BiscuitOS_ram_base);
+
+/* BiscuitOS debug stuf */
+int BiscuitOS_debug = 0;
+EXPORT_SYMBOL_GPL(BiscuitOS_debug);
+
 /* Command line from DTS */
 const char cmdline_dts[COMMAND_LINE_SIZE_BS];
 /* FIXME: TLB information: From ARMv7 Hard-Code */

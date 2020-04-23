@@ -3,4 +3,6 @@
 
 #define BITS_PER_LONG_BS	32
 
+typedef unsigned int kmem_bufctl_t_bs;
+
 #endif

@@ -26,6 +26,13 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/init/*.c))
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.c)) 
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.S)) 
 
+## Memory Allocator Test Code
+#  0) bootmem
+ $(MODULE_NAME)-m	+= modules/bootmem/main.o
+#  1) Buddy
+obj-m			+= $(MODULE_NAME)-buddy.o
+$(MODULE_NAME)-buddy-m	:= modules/buddy/main.o
+
 # LD-scripts
 ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
 ## CFlags
@@ -33,6 +40,8 @@ ccflags-y		+= -DCONFIG_NODES_SHIFT=0
 ccflags-y		+= -DCONFIG_NR_CPUS_BS=8
 # Support HighMem
 ccflags-y		+= -DCONFIG_HIGHMEM_BS
+# Support SLAB Debug
+ccflags-y		+= -DCONFIG_DEBUG_SLAB_BS
 ## ASFlags
 asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
 asflags-y		+= -I$(PWD)/include
@@ -106,6 +115,8 @@ clean:
 	@rm -rf *.ko *.o *.mod.o *.mod.c *.symvers *.order \
                .*.o.cmd .tmp_versions *.ko.cmd .*.ko.cmd \
 		mm/*.o arch/arm/*.o mm/.*.o.*  \
-		arch/arm/.*.o.* init/*.o
+		arch/arm/.*.o.* init/*.o modules/buddy/*.o \
+		modules/buddy/.*.cmd modules/bootmem/*.o \
+		modules/bootmem/.*.cmd
 
 endif

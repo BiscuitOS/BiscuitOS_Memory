@@ -14,9 +14,17 @@
 } while (0)
 
 
-#define BUG_ON_BS(condition) do { 					\
+#define BUG_ON_BS(condition) do { 				\
 	if (unlikely((condition)!=0)) 				\
-		BUG_BS(); 						\
+		BUG_BS(); 					\
+} while (0)
+
+#define WARN_ON_BS(condition) do {				\
+	if (unlikely((condition)!=0)) {				\
+		printk("Badness in %s at %s:%d\n", 		\
+			__FUNCTION__, __FILE__, __LINE__);	\
+		dump_stack();					\
+	}							\
 } while (0)
 
 #endif

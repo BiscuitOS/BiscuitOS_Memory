@@ -14,6 +14,7 @@
 #include "biscuitos/percpu.h"
 #include "biscuitos/mm.h"
 #include "biscuitos/bootmem.h"
+#include "biscuitos/slab.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/setup.h"
 
@@ -63,4 +64,5 @@ asmlinkage void __init start_kernel_bs(void)
 	printk(KERN_NOTICE "Kernel command line: %s\n", saved_command_line_bs);
 
 	mem_init_bs();
+	kmem_cache_init_bs();
 }
