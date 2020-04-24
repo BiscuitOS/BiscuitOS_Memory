@@ -151,10 +151,13 @@ void __init memmap_init_zone_bs(unsigned long size, int nid,
 		reset_page_mapcount_bs(page);
 		SetPageReserved_bs(page);
 		INIT_LIST_HEAD(&page->lru);
-		start_pfn++;
 #ifdef WAIT_PAGE_VIRTUAL
-		BS_DUP();
+		/* This shift won't overflow because ZONE_NORMAL is below 4G. */
+		if (!is_highmem_idx_bs(zone))
+			set_page_address_bs(page, 
+					__va_bs(start << PAGE_SHIFT_BS));
 #endif
+		start_pfn++;
 	}
 }
 

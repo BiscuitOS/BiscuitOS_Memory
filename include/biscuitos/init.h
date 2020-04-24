@@ -8,6 +8,7 @@ extern char saved_command_line_bs[];
  * Used for initiailzation calls...
  */
 typedef int (*bootmem_entry_t_bs)(void);
+typedef int (*buddy_entry_t_bs)(void);
 
 /* FIXME: BiscuitOS initall */
 
@@ -15,5 +16,10 @@ typedef int (*bootmem_entry_t_bs)(void);
 	static bootmem_entry_t_bs __bootmem_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".bootmem_data_bs"))) = fn
+
+#define buddy_initcall_bs(fn)						\
+	static buddy_entry_t_bs __buddy_entry_##fn			\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".buddy_data_bs"))) = fn
 
 #endif

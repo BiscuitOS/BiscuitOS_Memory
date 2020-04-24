@@ -170,6 +170,14 @@ static inline int page_mapcount_bs(struct page_bs *page)
 	return atomic_read(&(page)->_mapcount) + 1;
 }
 
+void *page_address_bs(struct page_bs *page);
+void set_page_address_bs(struct page_bs *page, void *virtual);
+
+static inline void *lowmem_page_address_bs(struct page_bs *page)
+{
+	return __va_bs(page_to_pfn_bs(page) << PAGE_SHIFT_BS);
+}
+
 extern unsigned long num_physpages_bs;
 
 #endif

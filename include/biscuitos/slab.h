@@ -34,6 +34,7 @@ typedef struct kmem_cache_s_bs kmem_cache_t_bs;
 /* flags passed to a constructor func */
 #define SLAB_CTOR_CONSTRUCTOR_BS	0x001UL	/* if not set, then deconstructor */
 #define SLAB_CTOR_ATOMIC_BS		0x002UL	/* tell constructor it can't sleep */
+#define SLAB_CTOR_VERIFY_BS		0x004UL	/* tell constructor it's a verify call */
 
 /* Size description struct for general caches. */
 struct cache_sizes_bs {
@@ -43,5 +44,43 @@ struct cache_sizes_bs {
 };
 
 extern void __init kmem_cache_init_bs(void);
+
+void *kmem_cache_alloc_bs(kmem_cache_t_bs *, unsigned int __nocast);
+void kmem_cache_free_bs(kmem_cache_t_bs *cachep, void *objp);
+static void cache_estimate_bs(unsigned long gfporder, size_t size,
+	size_t align, int flags, size_t *left_over, unsigned int *num);
+kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, int gfpflags);
+extern struct cache_sizes_bs malloc_sizes_bs[];
+extern void *__kmalloc_bs(size_t, unsigned int __nocast);
+void kfree_bs(const void *objp);
+kmem_cache_t_bs *
+kmem_cache_create_bs(const char *name, size_t size, size_t align,
+		unsigned long flags,
+		void (*ctor)(void *, kmem_cache_t_bs *, unsigned long),
+		void (*dtor)(void *, kmem_cache_t_bs *, unsigned long));
+
+static inline void *kmalloc_bs(size_t size, unsigned int __nocast flags)
+{
+	if (__builtin_constant_p(size)) {
+		int i = 0;
+#define CACHE_BS(x)						\
+		if (size <= x)					\
+			goto found;				\
+		else						\
+			i++;
+#include "biscuitos/kmalloc_sizes.h"
+#undef CACHE_BS
+found:
+		return kmem_cache_alloc_bs((flags & GFP_DMA_BS) ?
+			malloc_sizes_bs[i].cs_dmacachep :
+			malloc_sizes_bs[i].cs_cachep, flags);
+	}
+	return __kmalloc_bs(size, flags);
+}
+
+static inline void *kmalloc_node_bs(size_t size, int flags, int node)
+{
+	return kmalloc_bs(size, flags);
+}
 
 #endif

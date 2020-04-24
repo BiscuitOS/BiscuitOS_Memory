@@ -64,7 +64,7 @@ extern u32 BiscuitOS_PAGE_OFFSET;
 #define virt_addr_valid_bs(kaddr) ((unsigned long)(kaddr) >= PAGE_OFFSET_BS &&\
 		 (unsigned long)(kaddr) < (unsigned long)high_memory_bs)
 
-#define PHYS_TO_NID_BS(addr)       (0)
+#define PHYS_TO_NID_BS(addr)	(0)
 
 #endif
 

@@ -7,77 +7,76 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
-#include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
-
+#include <linux/errno.h>
 #include "biscuitos/kernel.h"
+#include "biscuitos/init.h"
 #include "biscuitos/mm.h"
 #include "biscuitos/gfp.h"
 
 /*
- * TestCase: alloc_pages() - page from Normal Zone
+ * TestCase: alloc page from Normal Zone
  */
-static int TestCase_alloc_pages(void)
+static int TestCase_alloc_page_from_normal(void)
 {
 	struct page_bs *pages;
-	int order = 1;
+	int order = 0;
+	void *addr;
 
-	/* Alloc pages */
+	/* allocate page from Buddy (Normal) */
 	pages = alloc_pages_bs(GFP_KERNEL_BS, order);
 	if (!pages) {
-		printk("alloc_pages_bs() from Normal Zone failed!\n");
+		printk("%s error\n", __func__);
+		return -ENOMEM;
+	}
+
+	/* Obtain page virtual address */
+	addr = page_address_bs(pages);
+	if (!addr) {
+		printk("%s bad page address!\n", __func__);
 		return -EINVAL;
 	}
-	printk("TestCase0: Page from Normal Zone, PFN %#lx\n", 
-						page_to_pfn_bs(pages));
+	sprintf((char *)addr, "BiscuitOS-%s", __func__);
+	bs_debug("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
-	/* Free pages */
+	/* free all pages to buddy */
 	free_pages_bs(pages, order);
+
+	return 0;
 }
+buddy_initcall_bs(TestCase_alloc_page_from_normal);
 
 /*
- * TestCase: alloc_pages() - page from DMA Zone
+ * TestCase: alloc page from HighMem Zone
  */
-static int TestCase_alloc_pages_DMA(void)
+static int TestCase_alloc_page_from_highmem(void)
 {
 	struct page_bs *pages;
-	int order = 1;
+	int order = 0;
+	void *addr;
 
-	/* Alloc pages */
-	pages = alloc_pages_bs(GFP_DMA_BS, order);
+	/* allocate page from Buddy (HighMem) */
+	pages = alloc_pages_bs(__GFP_HIGHMEM_BS, order);
 	if (!pages) {
-		printk("alloc_pages_bs() from DMA Zone failed\n");
-		return -EINVAL;
+		printk("%s error\n", __func__);
+		return -ENOMEM;
 	}
-	printk("TestCase1: Page from DMA Zone, PFN %#lx\n",
-						page_to_pfn_bs(pages));
 
-	/* Free pages */
+	if (!PageHighMem_bs(pages))
+		printk("%s Page doesn't from HighMem Zone\n");
+
+	/* Obtain page virtual address */
+	addr = page_address_bs(pages);
+	if (!addr) {
+		bs_debug("%s Page doesn't mapping to virtual\n", __func__);
+	} else {
+		sprintf((char *)addr, "BiscuitOS-%s", __func__);
+		bs_debug("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
+	}
+
+	/* free pages */
 	free_pages_bs(pages, order);
 
 	return 0;
 }
-
-/* Module initialize entry */
-static int __init Buddy_Allocator_init(void)
-{
-
-	TestCase_alloc_pages();
-	TestCase_alloc_pages_DMA();
-
-	return 0;
-}
-
-/* Module exit entry */
-static void __exit Buddy_Allocator_exit(void)
-{
-}
-
-module_init(Buddy_Allocator_init);
-module_exit(Buddy_Allocator_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("BiscuitOS <buddy.zhang@aliyun.com>");
-MODULE_DESCRIPTION("Buddy Allocator Test Case");
+buddy_initcall_bs(TestCase_alloc_page_from_highmem);

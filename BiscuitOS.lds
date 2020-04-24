@@ -16,6 +16,7 @@ SECTIONS {
 		__early_end_bs = .;
 	}
 
+	. = ALIGN(16);
 	/* bootmem */
 	.bootmem_bs 0 : {
 		__bootmem_start_bs = .;
@@ -30,5 +31,12 @@ SECTIONS {
 			*(.data.percpu_bs)
 		__per_cpu_end_bs = .;
 	}
+
 	. = ALIGN(16);
+	/* Buddy */
+	.buddy_bs : {
+		__buddy_start_bs = .;
+			*(.buddy_data_bs)
+		__buddy_end_bs = .;
+	}
 }

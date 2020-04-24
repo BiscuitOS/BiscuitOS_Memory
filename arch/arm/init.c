@@ -467,6 +467,10 @@ void __init mem_init_bs(void)
 {
 	unsigned int codepages, datapages, initpages;
 	int i, node;
+	/* FIXME: buddy debug not default code, it's used to
+	 * debug buddy on initialize stage. */
+	buddy_entry_t_bs *call;
+	extern buddy_entry_t_bs __buddy_start_bs[], __buddy_end_bs[];
 
 	codepages = _etext_bs - _text_bs;
 	datapages = _end_bs - __data_start_bs;
@@ -525,4 +529,9 @@ void __init mem_init_bs(void)
 		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS_BS;
 
 	}
+
+	/* FIXME: buddy_initcall entry, used to debug buddy,
+	 * This code isn't default code */
+	for (call = __buddy_start_bs; call < __buddy_end_bs; call++)
+		(*call)();
 }

@@ -58,4 +58,6 @@ static inline unsigned int __attribute_const__ read_cpuid_cachetype_bs(void)
 
 #endif
 
+#define cpu_to_node_bs(cpu)		(0)
+
 #endif

@@ -89,8 +89,15 @@ struct page_state_bs {
 	unsigned long nr_bounce;        /* pages for bounce buffers */
 };
 
+extern void __mod_page_state_bs(unsigned offset, unsigned long delta);
+
 #define mod_page_state_bs(member, delta)	\
 	__mod_page_state_bs(offsetof(struct page_state_bs, member), (delta))
+
+#define add_page_state_bs(member, delta)	\
+				mod_page_state_bs(member, 0UL - 1)
+#define sub_page_state_bs(member, delta)	\
+				mod_page_state_bs(member, 0UL - (delta))
 
 #define mod_page_state_zone_bs(zone, member, delta)			\
 	do {								\
@@ -126,6 +133,20 @@ struct page_state_bs {
 								&(page)->flags)
 #define __SetPagePrivate_bs(page)	__set_bit(PG_private_bs, \
 								&(page)->flags)
+
+#define PageSlab_bs(page)		test_bit(PG_slab_bs, &(page)->flags)
+#define SetPageSlab_bs(page)		set_bit(PG_slab_bs, &(page)->flags)
+#define ClearPageSlab_bs(page)		clear_bit(PG_slab_bs, &(page)->flags)
+#define TestClearPageSlab_bs(page)	test_and_clear_bit(PG_slab_bs, \
+								&(page)->flags)
+
+#ifdef CONFIG_HIGHMEM_BS
+#define PageHighMem_bs(page)		test_bit(PG_highmem_bs, &(page)->flags)
+#define SetPageHighMem_bs(page)		__set_bit(PG_highmem_bs, \
+								&(page)->flags)
+#else
+#define PageHighMem_bs(page)		0 /* needed to optimize away at compile time */
+#endif
 
 #ifdef CONFIG_HUGETLB_PAGE_BS
 #define PageCompound_bs(page)		test_bit(PG_compound_bs, &(page)->flags)

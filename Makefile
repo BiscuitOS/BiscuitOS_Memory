@@ -28,10 +28,11 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)
 
 ## Memory Allocator Test Code
 #  0) bootmem
- $(MODULE_NAME)-m	+= modules/bootmem/main.o
+$(MODULE_NAME)-m	+= modules/bootmem/main.o
 #  1) Buddy
-obj-m			+= $(MODULE_NAME)-buddy.o
-$(MODULE_NAME)-buddy-m	:= modules/buddy/main.o
+# obj-m			+= $(MODULE_NAME)-buddy.o
+# $(MODULE_NAME)-buddy-m	:= modules/buddy/module.o
+$(MODULE_NAME)-m	+= modules/buddy/main.o
 
 # LD-scripts
 ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds

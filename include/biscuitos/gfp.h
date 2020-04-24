@@ -58,9 +58,7 @@ extern void __free_pages_bs(struct page_bs *page, unsigned int order);
 
 extern void FASTCALL_BS(free_pages_bs(unsigned long addr, unsigned int order));
 
-#ifndef HAVE_ARCH_FREE_PAGE_BS
-static inline void arch_free_page_bs(struct page_bs *page, int order) { }
-#endif
+extern void arch_free_page_bs(struct page_bs *page, int order);
 
 extern struct page_bs *
 FASTCALL_BS(__alloc_pages_bs(unsigned int, unsigned int, struct zonelist_bs *));

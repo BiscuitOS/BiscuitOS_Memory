@@ -677,3 +677,22 @@ void __init create_memmap_holes_bs(struct meminfo *mi)
 	for_each_online_node_bs(node)
 		free_unused_memmap_node_bs(node, mi);
 }
+
+void arch_free_page_bs(struct page_bs *page, int order)
+{
+#ifdef CONFIG_HIGHMEM_BS
+	/* FIXME: Default ARM doesn't support HighMem Zone,
+	 * BiscuitOS support it. */
+	struct zone_bs *zone = page_zone_bs(page);
+
+	if (strcmp(zone->name, "HighMem") == 0) {
+		struct page_bs *tmp;
+		int idx;
+
+		for (idx = 0; idx < (1 << order); idx++) {
+			tmp = page + idx;
+			SetPageHighMem_bs(tmp);
+		}
+	}
+#endif
+}

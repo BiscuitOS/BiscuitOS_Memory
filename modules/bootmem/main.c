@@ -1,5 +1,5 @@
 /*
- * BiscuitOS Memory Manager: Buddy
+ * BiscuitOS Memory Manager: Bootmem
  *
  * (C) 2019.10.01 BuddyZhang1 <buddy.zhang@aliyun.com>
  *
