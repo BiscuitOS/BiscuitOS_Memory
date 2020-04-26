@@ -33,6 +33,15 @@ $(MODULE_NAME)-m	+= modules/bootmem/main.o
 # obj-m			+= $(MODULE_NAME)-buddy.o
 # $(MODULE_NAME)-buddy-m	:= modules/buddy/module.o
 $(MODULE_NAME)-m	+= modules/buddy/main.o
+#  2) Slab
+# obj-m			+= $(MODULE_NAME)-slab.o
+# $(MODULE_NAME)-slab-m	:= modules/slab/module.o
+$(MODULE_NAME)-m	+= modules/slab/main.o
+#  3) VMALLOC
+# obj-m			+= $(MODULE_NAME)-vmalloc.o
+# $(MODULE_NAME)-vmalloc-m	:= modules/vmalloc/module.o
+$(MODULE_NAME)-m	+= modules/vmalloc/main.o
+
 
 # LD-scripts
 ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
@@ -42,7 +51,7 @@ ccflags-y		+= -DCONFIG_NR_CPUS_BS=8
 # Support HighMem
 ccflags-y		+= -DCONFIG_HIGHMEM_BS
 # Support SLAB Debug
-ccflags-y		+= -DCONFIG_DEBUG_SLAB_BS
+# ccflags-y		+= -DCONFIG_DEBUG_SLAB_BS
 ## ASFlags
 asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
 asflags-y		+= -I$(PWD)/include
@@ -118,6 +127,8 @@ clean:
 		mm/*.o arch/arm/*.o mm/.*.o.*  \
 		arch/arm/.*.o.* init/*.o modules/buddy/*.o \
 		modules/buddy/.*.cmd modules/bootmem/*.o \
-		modules/bootmem/.*.cmd
+		modules/bootmem/.*.cmd \
+		modules/slab/.*.cmd modules/slab/*.o \
+		modules/vmalloc/.*.cmd modules/vmalloc/*.o
 
 endif

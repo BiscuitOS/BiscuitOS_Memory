@@ -19,6 +19,7 @@
 #include "biscuitos/cpuset.h"
 #include "biscuitos/page-flags.h"
 #include "biscuitos/sched.h"
+#include "biscuitos/highmem.h"
 #include "asm-generated/percpu.h"
 
 nodemask_t_bs node_online_map_bs = { { [0] = 1UL } };
@@ -889,7 +890,7 @@ static inline void prep_zero_page_bs(struct page_bs *page, int order,
 	BUG_ON_BS((gfp_flags & (__GFP_WAIT_BS | __GFP_HIGHMEM_BS)) == 
 							__GFP_HIGHMEM_BS);
 	for (i = 0; i < (1 << order); i++)
-		BS_DUP();
+		clear_highpage_bs(page + i);
 }
 
 /*
@@ -957,13 +958,10 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 	const int wait = gfp_mask & __GFP_WAIT_BS;
 	struct zone_bs **zones, *z;
 	struct page_bs *page;
-	struct reclaim_state_bs reclaim_state;
 	struct task_struct *p = current;
 	int i;
 	int classzone_idx;
-	int do_retry;
 	int can_try_harder;
-	int did_some_progress;
 
 	might_sleep_if(wait);
 
@@ -983,7 +981,6 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 
 	classzone_idx = zone_idx_bs(zones[0]);
 
-restart:
 	/* Go through the zonelist once, looking for a zone with enough free */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		if (!zone_watermark_ok_bs(z, order, z->pages_low,
@@ -1013,3 +1010,17 @@ fastcall_bs void free_pages_bs(unsigned long addr, unsigned int order)
 	}
 }
 EXPORT_SYMBOL_GPL(free_pages_bs);
+
+/*
+ * Common helper functions
+ */
+fastcall_bs unsigned long __get_free_pages_bs(unsigned int __nocast gfp_mask,
+						unsigned int order)
+{
+	struct page_bs *page;
+
+	page = alloc_pages_bs(gfp_mask, order);
+	if (!page)
+		return 0;
+	return (unsigned long)page_address_bs(page);
+}

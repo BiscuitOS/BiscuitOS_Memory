@@ -76,4 +76,13 @@ static inline struct page_bs *alloc_pages_node_bs(int nid,
 
 #define alloc_pages_bs(gfp_mask, order)	\
 		alloc_pages_node_bs(numa_node_id_bs(), gfp_mask, order)
+#define alloc_page_bs(gfp_mask)	alloc_pages_bs(gfp_mask, 0)
+
+extern unsigned long
+FASTCALL_BS(__get_free_pages_bs(unsigned int __nocast gfp_mask, unsigned int order));
+
+#define __get_free_page_bs(gfp_mask)				\
+		__get_free_pages_bs((gfp_mask), 0)
+
+#define free_page_bs(addr)	free_pages_bs((addr), 0)
 #endif

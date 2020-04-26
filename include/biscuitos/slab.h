@@ -3,6 +3,7 @@
 
 typedef struct kmem_cache_s_bs kmem_cache_t_bs;
 
+#include <linux/compiler.h>
 #include "biscuitos/gfp.h"
 
 /* flags for kmem_cache_alloc() */
@@ -47,8 +48,6 @@ extern void __init kmem_cache_init_bs(void);
 
 void *kmem_cache_alloc_bs(kmem_cache_t_bs *, unsigned int __nocast);
 void kmem_cache_free_bs(kmem_cache_t_bs *cachep, void *objp);
-static void cache_estimate_bs(unsigned long gfporder, size_t size,
-	size_t align, int flags, size_t *left_over, unsigned int *num);
 kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, int gfpflags);
 extern struct cache_sizes_bs malloc_sizes_bs[];
 extern void *__kmalloc_bs(size_t, unsigned int __nocast);

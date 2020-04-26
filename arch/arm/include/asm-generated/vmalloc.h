@@ -21,6 +21,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#define VMALLOC_END		(0xa0000000UL)
+#define VMALLOC_END_BS		(VMALLOC_START_BS+(20 << 20))
 
 #endif

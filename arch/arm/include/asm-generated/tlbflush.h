@@ -296,4 +296,6 @@ static inline void flush_pmd_entry_bs(pmd_t_bs *pmd)
 extern void flush_tlb_all_bs(void);
 #endif
 
+#define flush_tlb_kernel_range_bs(x, y)	do { } while (0)
+
 #endif

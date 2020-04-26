@@ -19,9 +19,9 @@ SECTIONS {
 	. = ALIGN(16);
 	/* bootmem */
 	.bootmem_bs 0 : {
-		__bootmem_start_bs = .;
+		bootmem_section_start_bs = .;
 			*(.bootmem_data_bs)
-		__bootmem_end_bs = .;
+		bootmem_section_end_bs = .;
 	}
 
 	. = ALIGN(16);
@@ -35,8 +35,23 @@ SECTIONS {
 	. = ALIGN(16);
 	/* Buddy */
 	.buddy_bs : {
-		__buddy_start_bs = .;
+		buddy_section_start_bs = .;
 			*(.buddy_data_bs)
-		__buddy_end_bs = .;
+		buddy_section_end_bs = .;
+	}
+
+	. = ALIGN(16);
+	/* Slab */
+	.slab_bs : {
+		slab_section_start_bs = .;
+			*(.slab_data_bs)
+		slab_section_end_bs = .;
+	}
+
+	/* Vmalloc */
+	.vmalloc_bs : {
+		vmalloc_section_start_bs = .;
+			*(.vmalloc_data_bs)
+		vmalloc_section_end_bs = .;
 	}
 }

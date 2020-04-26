@@ -283,6 +283,9 @@ static __init void reserve_node_zero_bs(unsigned int bootmap_pfn,
 			bootmap_pages << PAGE_SHIFT_BS);
 }
 
+/* FIXME: BiscuitOS bootmem entry */
+DEBUG_FUNC_T(bootmem);
+
 /*
  * Initialise the bootmem allocator for all nodes. This is called
  * early during the architecture specific initialisation.
@@ -292,9 +295,6 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 	struct node_info node_info[MAX_NUMNODES_BS], *np = node_info;
 	unsigned int bootmap_pages, bootmap_pfn, map_pg;
 	int node, initrd_node;
-	/* bootmem debug entry (not default) */
-	bootmem_entry_t_bs *call;
-	extern bootmem_entry_t_bs __bootmem_start_bs[], __bootmem_end_bs[];
 
 	bootmap_pages = find_memend_and_nodes_bs(mi, np);
 	bootmap_pfn   = find_bootmap_pfn_bs(0, mi, bootmap_pages);
@@ -360,8 +360,7 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 
 	/* FIXME: bootmem_initcall entry, used to debug bootmem,
 	 * This code isn't default code */
-	for (call = __bootmem_start_bs; call < __bootmem_end_bs; call++)
-		(*call)();	
+	DEBUG_CALL(bootmem);
 }
 
 /*
@@ -458,6 +457,9 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc_bs *mdesc)
 	flush_dcache_page_bs(empty_zero_page_bs);
 }
 
+/* FIXME: BiscuitOS buddy debug stuf */
+DEBUG_FUNC_T(buddy);
+
 /*
  * mem_init() marks the free areas in the mem_map and tells us how much
  * memory is free. This is done after various parts of the system have
@@ -467,10 +469,6 @@ void __init mem_init_bs(void)
 {
 	unsigned int codepages, datapages, initpages;
 	int i, node;
-	/* FIXME: buddy debug not default code, it's used to
-	 * debug buddy on initialize stage. */
-	buddy_entry_t_bs *call;
-	extern buddy_entry_t_bs __buddy_start_bs[], __buddy_end_bs[];
 
 	codepages = _etext_bs - _text_bs;
 	datapages = _end_bs - __data_start_bs;
@@ -532,6 +530,5 @@ void __init mem_init_bs(void)
 
 	/* FIXME: buddy_initcall entry, used to debug buddy,
 	 * This code isn't default code */
-	for (call = __buddy_start_bs; call < __buddy_end_bs; call++)
-		(*call)();
+	DEBUG_CALL(buddy);
 }

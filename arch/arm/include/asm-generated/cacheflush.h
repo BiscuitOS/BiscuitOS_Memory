@@ -26,6 +26,22 @@ extern void v7_flush_kern_cache_all_bs(void);
 
 #define flush_cache_all_bs()		__cpuc_flush_kern_all_bs()
 
+/*
+ * flush_cache_vmap() is used when creating mappings (eg, via vmap,
+ * vmalloc, ioremap etc) in kernel space for pages.  Since the
+ * direct-mappings of these pages may contain cached data, we need 
+ * to do a full cache flush to ensure that writebacks don't corrupt
+ * data placed into these pages via the new mappings.
+ */
+#define flush_cache_vmap_bs(start, end)		flush_cache_all_bs()
+#define flush_cache_vunmap_bs(start, end)	flush_cache_all_bs()
+
+/*
+ * Perform necessary cache operations to ensure that the TLB will
+ * see data written in the specified area.
+ */     
+#define clean_dcache_area_bs(start,size)	do { } while (0)
+
 #define flush_dcache_page_bs(page)	do { } while (0)
 
 #endif

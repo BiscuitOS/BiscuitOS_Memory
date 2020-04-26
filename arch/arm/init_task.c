@@ -10,7 +10,7 @@
 #include <linux/kernel.h>
 #include "asm-generated/pgtable.h"
 
-pgd_t_bs swapper_pg_dir_array_bs[2048];
+pgd_t_bs swapper_pg_dir_array_bs[4096];
 
 struct mm_struct_bs init_mm_bs = {
 	.pgd = swapper_pg_dir_array_bs,

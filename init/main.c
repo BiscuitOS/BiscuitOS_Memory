@@ -15,6 +15,7 @@
 #include "biscuitos/mm.h"
 #include "biscuitos/bootmem.h"
 #include "biscuitos/slab.h"
+#include "biscuitos/init.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/setup.h"
 
@@ -50,6 +51,8 @@ static void __init setup_per_cpu_areas_bs(void)
 	}
 }
 
+DEBUG_FUNC_T(vmalloc);
+
 asmlinkage void __init start_kernel_bs(void)
 {
 	const char *cmdline;
@@ -65,4 +68,5 @@ asmlinkage void __init start_kernel_bs(void)
 
 	mem_init_bs();
 	kmem_cache_init_bs();
+	DEBUG_CALL(vmalloc);
 }

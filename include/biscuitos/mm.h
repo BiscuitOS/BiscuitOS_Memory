@@ -179,5 +179,7 @@ static inline void *lowmem_page_address_bs(struct page_bs *page)
 }
 
 extern unsigned long num_physpages_bs;
+extern pte_t_bs *FASTCALL_BS(pte_alloc_kernel_bs(struct mm_struct_bs *mm,
+				pmd_t_bs *pmd, unsigned long address));
 
 #endif

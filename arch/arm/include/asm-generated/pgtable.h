@@ -11,6 +11,9 @@
  */
 #ifndef __ASSEMBLY__
 #include "asm-generated/memory.h"
+#include "biscuitos/linkage.h"
+#include "biscuitos/gfp.h"
+#include "asm-generated/cacheflush.h"
 #endif
 
 #ifdef __ASSEMBLY__
@@ -70,6 +73,24 @@ typedef struct { pgd_t_bs pgd; } pud_t_bs;
 typedef u32 pteval_t_bs;
 typedef u32 pmdval_t_bs;
 
+#endif
+
+/*
+ * Just any arbitrary offset to the start of the vmalloc VM area: the
+ * current 8MB value just means that there will be a 8MB "hole" after the
+ * physical memory until the kernel virtual memory starts.  That means that
+ * any out-of-bounds memory accesses will hopefully be caught.
+ * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+ * area for the same reason. ;)
+ *
+ * Note that platforms may override VMALLOC_START, but they must provide
+ * VMALLOC_END.  VMALLOC_END defines the (exclusive) limit of this space,
+ * which may not overlap IO space. 
+ */
+#ifndef VMALLOC_START_BS
+#define VMALLOC_OFFSET_BS	(8*1024)
+#define VMALLOC_START_BS	(((unsigned long)high_memory_bs +	\
+				VMALLOC_OFFSET_BS) & ~(VMALLOC_OFFSET_BS-1))
 #endif
 
 /*
@@ -334,6 +355,9 @@ typedef u32 pmdval_t_bs;
 extern pgprot_t_bs		pgprot_kernel_bs;
 #endif
 
+#define _MOD_PROT_BS(p, b)	__pgprot_bs(pgprot_val_bs(p) | (b))
+
+#define PAGE_KERNEL_BS		_MOD_PROT_BS(pgprot_kernel_bs, L_PTE_XN)
 #define __PAGE_NONE		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_RDONLY | \
 						L_PTE_XN | L_PTE_NONE) 
 #define __PAGE_SHARED		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
@@ -381,6 +405,7 @@ extern void cpu_v7_set_pte_ext_bs(pte_t_bs *, pte_t_bs, unsigned int);
 extern struct mm_struct_bs init_mm_bs;
 
 #define pmd_none_bs(pmd)	(!pmd_val_bs(pmd))
+#define pmd_present_bs(pmd)	(pmd_val_bs(pmd))
 
 /* FIXME: Host function */
 
@@ -402,6 +427,31 @@ static inline pte_t_bs *pmd_page_kernel_bs(pmd_t_bs pmd)
 	return __va_bs(ptr);
 }
 
+/*
+ * The "pgd_xxx()" functions here are trivial for a folded two-level
+ * setup: the pgd is never bad, and a pmd always exists (as it's folded
+ * into the pgd entry)
+ */
+#define pgd_none_bs(pgd)	(0)
+#define pgd_bad_bs(pgd)		(0)
+#define pgd_present_bs(pgd)	(1)
+#define pgd_clear_bs(pgdp)	do { } while (0)
+#define set_pgd_bs(pgd,pgdp)	do { } while (0)
+extern void pgd_clear_bad_bs(pgd_t_bs *pgd);
+#define pgd_ERROR_bs(pgd)					\
+			printk("%s %d %ld", __FILE__,__LINE__,pgd_val_bs(pgd))
+
+static inline int pgd_none_or_clear_bad_bs(pgd_t_bs *pgd)
+{
+	if (pgd_none_bs(*pgd))
+		return 1;
+	if (unlikely(pgd_bad_bs(*pgd))) {
+		pgd_clear_bad_bs(pgd);
+		return 1;
+	}
+	return 0;
+}
+
 /* we don't need complex calculations here as the pmd is folded into the pgd */
 #define pmd_addr_end_bs(addr,end)	(end)
 
@@ -418,10 +468,48 @@ static inline pud_t_bs *pud_offset_bs(pgd_t_bs *pgd, unsigned long address)
 	return (pud_t_bs *)pgd;
 }
 
+#define pud_none_bs(pud)			0
+#define pud_bad_bs(pud)				0
+#define pud_ERROR_bs(pud)			do { } while (0)
+#define pud_clear_bs(pud)			pgd_clear_bs(pud)
+#define pud_alloc_bs(mm, pgd, address)		(pud_t_bs *)(pgd)
 #define pud_addr_end_bs(addr, end)		(end)
+extern void pud_clear_bad_bs(pud_t_bs *pud);
+
+static inline int pud_none_or_clear_bad_bs(pud_t_bs *pud)
+{
+	if (pud_none_bs(*pud))
+		return 1;
+	if (unlikely(pud_bad_bs(*pud))) {
+		pud_clear_bad_bs(pud);
+		return 1;
+	}
+	return 0;
+}
 
 /* Find an entry in the second-level page table.. */
 #define pmd_offset_bs(dir, addr)	((pmd_t_bs *)(dir))
+
+extern pmd_t_bs fastcall_bs *__pmd_alloc_bs(struct mm_struct_bs *mm, 
+					pud_t_bs *pud, unsigned long address);
+
+#define pmd_alloc_bs(mm, pud, address)					\
+({									\
+	pmd_t_bs *ret;							\
+	if (pgd_none_bs(*pud))						\
+		ret = __pmd_alloc_bs(mm, pud, address);			\
+	else								\
+		ret = pmd_offset_bs(pud, address);			\
+	ret;								\
+})
+
+#define pte_none_bs(pte)		(!pte_val_bs(pte))
+
+/*      
+ * Conversion functions: convert a page and protection to a page entry,
+ * and a page entry and page directory to the page they refer to.
+ */
+#define mk_pte_bs(page, prot)		pfn_pte_bs(page_to_pfn_bs(page),prot)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_index_bs(addr)		(((addr) >> PAGE_SHIFT_BS) & \
@@ -433,6 +521,21 @@ static inline pud_t_bs *pud_offset_bs(pgd_t_bs *pgd, unsigned long address)
 					pgprot_val_bs(prot)))
 
 #define set_pte_bs(ptep, pte)	cpu_v7_set_pte_ext_bs(ptep, pte, 0)
+#define set_pte_at_bs(mm,addr,ptep,pteval)	set_pte_bs(ptep,pteval)
+#define pte_clear_bs(mm,addr,ptep)					\
+				set_pte_at_bs((mm),(addr),(ptep), __pte_bs(0))
+/*
+ * The following only work if pte_present() is true.
+ * Undefined behaviour if not..
+ */
+#define pte_present_bs(pte)	(pte_val_bs(pte) & L_PTE_PRESENT)
+
+#define ptep_get_and_clear_bs(__mm, __address, __ptep)			\
+({									\
+	pte_t_bs __pte = *(__ptep);					\
+	pte_clear_bs((__mm), (__address), (__ptep));			\
+	__pte;								\
+})
 
 typedef void (*cpu_set_pte_ext_t)(pte_t_bs *, pte_t_bs, unsigned int);
 

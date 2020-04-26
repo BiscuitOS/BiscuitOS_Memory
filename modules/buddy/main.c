@@ -40,7 +40,7 @@ static int TestCase_alloc_page_from_normal(void)
 	bs_debug("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
 	/* free all pages to buddy */
-	free_pages_bs(pages, order);
+	free_pages_bs((unsigned long)pages, order);
 
 	return 0;
 }
@@ -63,7 +63,7 @@ static int TestCase_alloc_page_from_highmem(void)
 	}
 
 	if (!PageHighMem_bs(pages))
-		printk("%s Page doesn't from HighMem Zone\n");
+		printk("%s Page doesn't from HighMem Zone\n", __func__);
 
 	/* Obtain page virtual address */
 	addr = page_address_bs(pages);
@@ -75,7 +75,7 @@ static int TestCase_alloc_page_from_highmem(void)
 	}
 
 	/* free pages */
-	free_pages_bs(pages, order);
+	free_pages_bs((unsigned long)pages, order);
 
 	return 0;
 }

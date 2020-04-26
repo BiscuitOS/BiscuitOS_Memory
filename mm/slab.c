@@ -83,10 +83,13 @@
 #include <linux/cpumask.h>
 #include <linux/rculist.h>
 #include <linux/jiffies.h>
+#include <linux/semaphore.h>
+#include <asm/uaccess.h>
 #include "biscuitos/kernel.h"
 #include "asm-generated/page.h"
 #include "biscuitos/slab.h"
 #include "biscuitos/mm.h"
+#include "biscuitos/init.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/types.h"
 #include "asm-generated/semaphore.h"
@@ -456,7 +459,6 @@ static kmem_cache_t_bs cache_cache_bs = {
 	.limit		= BOOT_CPUCACHE_ENTRIES_BS,
 	.objsize	= sizeof(kmem_cache_t_bs),
 	.flags		= SLAB_NO_REAP_BS,
-	.spinlock	= __ARCH_SPIN_LOCK_UNLOCKED,
 	.name		= "kmem_cache_bs",
 #if DEBUG
 	.reallen	= sizeof(kmem_cache_t_bs),
@@ -464,7 +466,7 @@ static kmem_cache_t_bs cache_cache_bs = {
 };
 
 /* Guard access to the cache-chain. */
-static struct semaphore_bs	cache_chain_sem_bs;
+static struct semaphore		cache_chain_sem_bs;
 static struct list_head		cache_chain_bs;
 
 /*
@@ -500,6 +502,9 @@ struct cache_sizes_bs malloc_sizes_bs[] = {
 #undef CACHE_BS
 };
 EXPORT_SYMBOL_GPL(malloc_sizes_bs);
+
+static void cache_estimate_bs(unsigned long gfporder, size_t size,
+	size_t align, int flags, size_t *left_over, unsigned int *num);
 
 static void kmem_flagcheck_bs(kmem_cache_t_bs *cachep, unsigned int flags)
 {
@@ -637,19 +642,20 @@ static unsigned long *dbg_redzone2_bs(kmem_cache_t_bs *cachep, void *objp)
 #define check_irq_on_bs()		do { } while (0)
 #define check_spinlock_acquired_bs(x)	do { } while (0)
 #define check_slabp_bs(x, y)		do { } while (0)
+#define kfree_debugcheck_bs(x)		do { } while (0)
 #endif
 
 #define slab_error_bs(cachep, msg) __slab_error_bs(__FUNCTION__, cachep, msg)
 
-static void __slab_error_bs(const char *function, kmem_cache_t_bs *cachep,
-						char *msg)
+static void __used __slab_error_bs(const char *function, 
+				kmem_cache_t_bs *cachep, char *msg)
 {
 	printk(KERN_INFO "slab error in %s(): cahce '%s': %s\n",
 			function, cachep->name, msg);
 	dump_stack();
 }
 
-static void poison_obj_bs(kmem_cache_t_bs *cachep, void *addr, 
+static void __used poison_obj_bs(kmem_cache_t_bs *cachep, void *addr, 
 						unsigned char val)
 {
 	int size = obj_reallen_bs(cachep);
@@ -986,7 +992,7 @@ alloc_done:
 		if (!x && ac->avail == 0)	// no objects in sight? abort
 			return NULL;
 
-		if (!ac->avail)		// objects refilled by interrupt?
+		if (!ac->avail)	// objects refilled by interrupt?
 			goto retry;
 	}
 	ac->touched = 1;
@@ -2079,10 +2085,43 @@ next:
 				((unsigned long)cachep)%REAPTIMEOUT_LIST3_BS;
 
 	/* Need the semaphore to access the chain */
-	/* FIXME: ????? */
+	down(&cache_chain_sem_bs);
+	{
+		struct list_head *p;
+		mm_segment_t old_fs;
+	
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		list_for_each(p, &cache_chain_bs) {
+			kmem_cache_t_bs *pc = 
+					list_entry(p, kmem_cache_t_bs, next);
+			char tmp;
+
+			/* This happens when the module gets unloaded and 
+			 * doesn't destroy its slab cache and noone else
+			 * reuses the vmalloc area of the module. Print a
+			 * warning.
+			 */
+			if (__get_user(tmp, pc->name)) {
+				printk("SLAB: cahce with size %d has lost "
+						"its name\n", pc->objsize);
+				continue;
+			}
+			if (!strcmp(pc->name, name)) {
+				printk("kmem_cache_create: duplicate "
+							"cache %s\n", name);
+				up(&cache_chain_sem_bs);
+				// unlock_cpu_hotplug
+				BUG_BS();
+			}
+		}
+
+		set_fs(old_fs);
+	}
+
 	/* cache setup completed, link it into the list */
 	list_add(&cachep->next, &cache_chain_bs);
-	// up(&cache_chain_sem)
+	up(&cache_chain_sem_bs);
 	// unlock_cup_hotplug();
 opps:
 	if (!cachep && (flags & SLAB_PANIC_BS))
@@ -2119,6 +2158,9 @@ static void cache_estimate_bs(unsigned long gfporder, size_t size,
 	wastage -= ALIGN(base+i*extra, align);
 	*left_over = wastage;
 }
+
+/* FIXME: BiscuitOS slab debug stuf */
+DEBUG_FUNC_T(slab);
 
 /*
  * Initialisation
@@ -2157,11 +2199,11 @@ void __init kmem_cache_init_bs(void)
 
 	/* 1) create the cache_cache */
 	init_MUTEX_bs(&cache_chain_sem_bs);
+	spin_lock_init(&cache_cache_bs.spinlock);
 	INIT_LIST_HEAD(&cache_chain_bs);
 	list_add(&cache_cache_bs.next, &cache_chain_bs);
 	cache_cache_bs.colour_off = cache_line_size_bs();
 	cache_cache_bs.array[smp_processor_id()] = &initarray_cache_bs.cache;
-
 	cache_cache_bs.objsize = ALIGN(cache_cache_bs.objsize, 
 						cache_line_size_bs());
 	cache_estimate_bs(0, cache_cache_bs.objsize, cache_line_size_bs(),
@@ -2193,6 +2235,23 @@ void __init kmem_cache_init_bs(void)
 					(ARCH_KMALLOC_FLAGS_BS | SLAB_PANIC_BS),
 					NULL,
 					NULL);
+
+		/* Inc off-slab bufctl limit until the ceiling is hit. */
+		if (!(OFF_SLAB_BS(sizes->cs_cachep))) {
+			offslab_limit_bs = sizes->cs_size - 
+						sizeof(struct slab_bs);
+			offslab_limit_bs /= sizeof(kmem_bufctl_t_bs);
+		}
+
+		sizes->cs_dmacachep = kmem_cache_create_bs(
+					names->name_dma,
+					sizes->cs_size,
+					ARCH_KMALLOC_MINALIGN_BS,
+					(ARCH_KMALLOC_FLAGS_BS |
+					SLAB_CACHE_DMA_BS | SLAB_PANIC_BS),
+					NULL,
+					NULL);
+
 		sizes++;
 		names++;
 	}
@@ -2224,16 +2283,16 @@ void __init kmem_cache_init_bs(void)
 	/* 5) resize the head arrays to their final sizes */
 	{
 		kmem_cache_t_bs *cachep;
-		// down
+		down(&cache_chain_sem_bs);
 		list_for_each_entry(cachep, &cache_chain_bs, next)
 			enable_cpucache_bs(cachep);
+		up(&cache_chain_sem_bs);
 	}
 
 	/* Done! */
 	g_cpucache_up_bs = FULL_BS;
 
-	/* Register a cpu startup notifier callback
-	 * that initializes ac_data for all new cpus
-	 */
-	//
+	/* FIXME: slab_initcall entry, used to debug slab,
+	 * This code isn't default code */
+	DEBUG_CALL(slab);
 }
