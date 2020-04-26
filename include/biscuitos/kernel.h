@@ -6,6 +6,14 @@
 
 #define __unused	__attribute__((__unused__))
 
+static inline int __attribute__((pure)) long_log2_bs(unsigned long x)
+{
+	int r = 0;
+	for (x >>= 1; x > 0; x >>= 1)
+		r++;
+	return r;
+}
+
 #define BS_DUP()  printk("Expand..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
 #define BS_DONE() printk("Done..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
 

@@ -10,15 +10,19 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+#include <linux/seq_file.h>
 #include "biscuitos/kernel.h"
 #include "biscuitos/nodemask.h"
 #include "biscuitos/mmzone.h"
 #include "biscuitos/bootmem.h"
+#include "biscuitos/init.h"
 #include "biscuitos/mm.h"
 #include "biscuitos/swap.h"
 #include "biscuitos/cpuset.h"
 #include "biscuitos/page-flags.h"
 #include "biscuitos/sched.h"
+#include "biscuitos/slab.h"
+#include "biscuitos/vmalloc.h"
 #include "biscuitos/highmem.h"
 #include "asm-generated/percpu.h"
 
@@ -45,12 +49,23 @@ EXPORT_SYMBOL_GPL(zone_table_bs);
  */
 static DEFINE_PER_CPU_BS(struct page_state_bs, page_states_bs) = {0};
 
+/*
+ * results with 256, 32 in the lowmem_reserve sysctl:
+ *      1G machine -> (16M dma, 800M-16M normal, 1G-800M high)
+ *      1G machine -> (16M dma, 784M normal, 224M high)
+ *      NORMAL allocation will leave 784M/256 of ram reserved in the ZONE_DMA
+ *      HIGHMEM allocation will leave 224M/32 of ram reserved in ZONE_NORMAL
+ *      HIGHMEM allocation will (224M+784M)/256 of ram reserved in ZONE_DMA
+ */
+int sysctl_lowmem_reserve_ratio_bs[MAX_NR_ZONES_BS-1] = { 256, 32 };
+
 unsigned long __initdata nr_kernel_pages_bs;
 unsigned long __initdata nr_all_pages_bs;
 unsigned long totalram_pages_bs;
 unsigned long totalhigh_pages_bs;
 
 static char *zone_names_bs[MAX_NR_ZONES_BS] = { "DMA", "Normal", "HighMem" };
+int min_free_kbytes_bs = 1024;
 
 static void __init calculate_zone_totalpages_bs(struct pglist_data_bs *pgdat,
 	unsigned long *zones_size, unsigned long *zholes_size)
@@ -996,6 +1011,7 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 	}
 
 	BS_DUP();
+
 got_pg:
 	zone_statistics_bs(zonelist, z);
 	return page;
@@ -1023,4 +1039,368 @@ fastcall_bs unsigned long __get_free_pages_bs(unsigned int __nocast gfp_mask,
 	if (!page)
 		return 0;
 	return (unsigned long)page_address_bs(page);
+}
+
+void __get_page_state_bs(struct page_state_bs *ret, int nr)
+{
+	int cpu = 0;
+
+	memset(ret, 0, sizeof(*ret));
+
+	while (cpu < NR_CPUS_BS) {
+		unsigned long *in, *out, off;
+
+		in = (unsigned long *)&per_cpu_bs(page_states_bs, cpu);
+
+		cpu++;
+
+		if (cpu < NR_CPUS_BS)
+			prefetch(&per_cpu_bs(page_states_bs, cpu));
+
+		out = (unsigned long *)ret;
+		for (off = 0; off < nr; off++)
+			*out++ += *in++;
+	}
+	
+}
+
+void get_full_page_state_bs(struct page_state_bs *ret)
+{
+	__get_page_state_bs(ret, sizeof(*ret) / sizeof(unsigned long));
+}
+
+static char *vmstat_text_bs[] = {
+	"nr_dirty",
+	"nr_writeback",
+	"nr_unstable",
+	"nr_page_table_pages",
+	"nr_mapped",
+	"nr_slab",
+
+	"pgpgin",
+	"pgpgout",
+	"pswpin",
+	"pswpout",
+	"pgalloc_high",
+
+	"pgalloc_normal",
+	"pgalloc_dma",
+	"pgfree",
+	"pgactivate",
+	"pgdeactivate",
+
+	"pgfault",
+	"pgmajfault",
+	"pgrefill_high",
+	"pgrefill_normal",
+	"pgrefill_dma",
+
+	"pgsteal_high",
+	"pgsteal_normal",
+	"pgsteal_dma",
+	"pgscan_kswapd_high",
+	"pgscan_kswapd_normal",
+
+	"pgscan_kswapd_dma",
+	"pgscan_direct_high",
+	"pgscan_direct_normal",
+	"pgscan_direct_dma",
+	"pginodesteal",
+
+	"slabs_scanned",
+	"kswapd_steal",
+	"kswapd_inodesteal",
+	"pageoutrun",
+	"allocstall",
+
+	"pgrotated",
+	"nr_bounce",
+};
+
+static void *vmstat_start_bs(struct seq_file *m, loff_t *pos)
+{
+	struct page_state_bs *ps;
+
+	if (*pos >= ARRAY_SIZE(vmstat_text_bs))
+		return NULL;
+
+	ps = kmalloc_bs(sizeof(*pos), GFP_KERNEL_BS);
+	m->private = ps;
+	if (!ps)
+		return ERR_PTR(-ENOMEM);
+	get_full_page_state_bs(ps);
+	ps->pgpgin /= 2;
+	ps->pgpgin /= 2;
+	return (unsigned long *)ps + *pos;
+}
+
+static void *vmstat_next_bs(struct seq_file *m, void *arg, loff_t *pos)
+{
+	(*pos)++;
+	if (*pos >= ARRAY_SIZE(vmstat_text_bs))
+		return NULL;
+	return (unsigned long *)m->private + *pos;
+}
+
+static int vmstat_show_bs(struct seq_file *m, void *arg)
+{
+	unsigned long *l = arg;
+	unsigned long off = l - (unsigned long *)m->private;
+
+	seq_printf(m, "%s %lu\n", vmstat_text_bs[off], *l);
+	return 0;
+}
+
+static void vmstat_stop_bs(struct seq_file *m, void *arg)
+{
+	kfree_bs(m->private);
+	m->private = NULL;
+}
+
+struct seq_operations vmstat_op_bs = {
+	.start	= vmstat_start_bs,
+	.next	= vmstat_next_bs,
+	.stop	= vmstat_stop_bs,
+	.show	= vmstat_show_bs,
+};
+
+/*
+ * setup_per_zone_pages_min - called when min_free_kbytes changes. Ensures
+ *      that the pages_{min,low,high} values for each zone are set correctly
+ *      with respect to min_free_kbytes.
+ */
+static void setup_per_zone_pages_min_bs(void)
+{
+	unsigned long pages_min = min_free_kbytes_bs >> (PAGE_SHIFT_BS - 10);
+	unsigned long lowmem_pages = 0;
+	struct zone_bs *zone;
+	unsigned long flags;
+
+	/* Calculate total number of !ZONE_HIGHMEM pages */
+	for_each_zone_bs(zone) {
+		if (!is_highmem_bs(zone))
+			lowmem_pages += zone->present_pages;
+	}
+
+	for_each_zone_bs(zone) {
+		spin_lock_irqsave(&zone->lru_lock, flags);
+		if (is_highmem_bs(zone)) {
+			/*
+			 * Often, highmem doesn't need to reserve any pages.
+			 * But the pages_min/low/high values are also used
+			 * for batching up page reclaim activity so we need
+			 * a decent value here.
+			 */
+			int min_pages;
+
+			min_pages = zone->present_pages / 1024;
+			if (min_pages < SWAP_CLUSTER_MAX_BS)
+				min_pages = SWAP_CLUSTER_MAX_BS;
+			if (min_pages > 128)
+				min_pages = 128;
+			zone->pages_min = min_pages;
+		} else {
+			/* if it's a lowmem zone, reserve a number of pages
+			 * proprotionate to the zone's size.
+			 */
+			zone->pages_min = (pages_min * zone->present_pages) /
+							lowmem_pages;
+		}
+
+		/*
+		 * When interpreting these watermarks, just keep in mind that:
+		 * zone->pages_min == (zone->pages_min * 4) / 4;
+		 */
+		zone->pages_low = (zone->pages_min * 5) / 4;
+		zone->pages_high = (zone->pages_min * 6) / 4;
+		spin_unlock_irqrestore(&zone->lru_lock, flags);
+	}
+}
+
+/*
+ * setup_per_zone_lowmem_reserve - called whenever
+ *      sysctl_lower_zone_reserve_ration changes. Ensure that each zone
+ *      has a correct pages resrved value, so an adequate number of
+ *      pages are left in the zone after a successful __alloc_pages().
+ */
+static void setup_per_zone_lowmem_reserve_bs(void)
+{
+	struct pglist_data_bs *pgdat;
+	int j, idx;
+
+	for_each_pgdat_bs(pgdat) {
+		for (j = 0; j < MAX_NR_ZONES_BS; j++) {
+			struct zone_bs *zone = pgdat->node_zones + j;
+			unsigned long present_pages = zone->present_pages;
+
+			zone->lowmem_reserve[j] = 0;
+
+			for (idx = j-1; idx >= 0; idx--) {
+				struct zone_bs *lower_zone;
+
+				if (sysctl_lowmem_reserve_ratio_bs[idx] < 1)
+					sysctl_lowmem_reserve_ratio_bs[idx] = 1;
+
+				lower_zone = pgdat->node_zones + idx;
+				lower_zone->lowmem_reserve[j] = present_pages / 
+					sysctl_lowmem_reserve_ratio_bs[idx];
+				present_pages += lower_zone->present_pages;
+			}
+		}
+	}
+}
+
+static unsigned int nr_free_zone_pages_bs(int offset)
+{
+	pg_data_t_bs *pgdat;
+	unsigned int sum = 0;
+
+	for_each_pgdat_bs(pgdat) {
+		struct zonelist_bs *zonelist = pgdat->node_zonelists + offset;
+		struct zone_bs **zonep = zonelist->zones;
+		struct zone_bs *zone;
+
+		for (zone = *zonep++; zone; zone = *zonep++) {
+			unsigned long size = zone->present_pages;
+			unsigned long high = zone->pages_high;
+
+			if (size > high)
+				sum += size - high;
+		}
+	}
+
+	return sum;
+}
+
+/*
+ * Amount of free RAM allocatable within ZONE_DMA and ZONE_NORMAL
+ */
+unsigned int nr_free_buffer_pages_bs(void)
+{
+	return nr_free_zone_pages_bs(GFP_USER_BS & GFP_ZONEMASK_BS);
+}
+
+/*
+ * Initialise min_free_kbytes.
+ *
+ * For small machines we want it small (128k min).  For large machines
+ * we want it large (64MB max).  But it is not linear, because network
+ * bandwidth does not increase linearly with machine size.  We use
+ *
+ *      min_free_kbytes = 4 * sqrt(lowmem_kbytes), for better accuracy:
+ *      min_free_kbytes = sqrt(lowmem_kbytes * 16)
+ *
+ * which yields
+ *
+ * 16MB:        512k
+ * 32MB:        724k
+ * 64MB:        1024k
+ * 128MB:       1448k
+ * 256MB:       2048k
+ * 512MB:       2896k
+ * 1024MB:      4096k
+ * 2048MB:      5792k
+ * 4096MB:      8192k
+ * 8192MB:      11584k
+ * 16384MB:     16384k
+ */
+static int __init init_per_zone_pages_min_bs(void)
+{
+	unsigned long lowmem_kbytes;
+
+	lowmem_kbytes = nr_free_buffer_pages_bs() * (PAGE_SIZE_BS >> 10);
+
+	min_free_kbytes_bs = int_sqrt(lowmem_kbytes * 16);
+	if (min_free_kbytes_bs < 128)
+		min_free_kbytes_bs = 128;
+	if (min_free_kbytes_bs > 65536)
+		min_free_kbytes_bs = 65536;
+	setup_per_zone_pages_min_bs();
+	setup_per_zone_lowmem_reserve_bs();
+	return 0;
+}
+module_initcall_bs(init_per_zone_pages_min_bs);
+
+__initdata int hashdist_bs = HASHDIST_DEFAULT_BS;
+
+/*
+ * allocate a large system hash table from bootmem
+ * - it is assumed that the hash table must contain an exact power-of-2
+ *   quantity of entries
+ * - limit is the number of hash buckets, not the total allocation size
+ */
+void *__init alloc_large_system_hash_bs(const char *tablename,
+				unsigned long bucketsize,
+				unsigned long numentries,
+				int scale,
+				int flags,
+				unsigned int *_hash_shift,
+				unsigned int *_hash_mask,
+				unsigned long limit)
+{
+	unsigned long long max = limit;
+	unsigned long log2qty, size;
+	void *table = NULL;
+
+	/* alloc the kernel cmdline to have a say */
+	if (!numentries) {
+		/* round applicable memory size up to nearest megabyte */
+		numentries = (flags & HASH_HIGHMEM_BS) ? 
+				nr_all_pages_bs : nr_kernel_pages_bs;
+		numentries += (1UL << (20 - PAGE_SHIFT_BS)) - 1;
+		numentries >>= 20 - PAGE_SHIFT_BS;
+		numentries <<= 20 - PAGE_SHIFT_BS;
+
+		/* limit to 1 bucket per 2^scale bytes of low memory */
+		if (scale > PAGE_SHIFT_BS)
+			numentries >>= (scale - PAGE_SHIFT_BS);
+		else
+			numentries <<= (PAGE_SHIFT_BS - scale);
+	}
+
+	/* limit allocation size to 1/16 total memory by default */
+	if (max == 0) {
+		max = ((unsigned long long)nr_all_pages_bs << 
+							PAGE_SHIFT_BS) >> 4;
+		do_div(max, bucketsize);
+	}
+
+	if (numentries > max)
+		numentries = max;
+
+	log2qty = long_log2_bs(numentries);
+
+	do {
+		size = bucketsize << log2qty;
+		if (flags & HASH_EARLY_BS)
+			table = alloc_bootmem_bs(size);
+		else if (hashdist_bs)
+			table = __vmalloc_bs(size, 
+					GFP_ATOMIC_BS, PAGE_KERNEL_BS);
+		else {
+			unsigned long order;
+
+			for (order = 0; ((1UL << order) << 
+					PAGE_SHIFT_BS) < size; order++)
+				;
+			table = (void *)__get_free_pages_bs(GFP_ATOMIC_BS, 
+									order);
+		}
+	} while (!table && size > PAGE_SIZE_BS && --log2qty);
+
+	if (!table)
+		panic("Failed to allocate %s hash table\n", tablename);
+
+	printk("%s hash table entries: %d (order: %d, %lu bytes)\n",
+		tablename,
+		(1U << log2qty,
+		long_log2_bs(size) - PAGE_SHIFT_BS,
+		size));
+
+	if (_hash_shift)
+		*_hash_shift = log2qty;
+	if (_hash_mask)
+		*_hash_mask = (1 << log2qty) - 1;
+
+	return table;
 }

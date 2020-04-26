@@ -22,6 +22,7 @@ ARCH_MM			:= arm
 ## Source Code
 $(MODULE_NAME)-m	:= main.o
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/mm/*.c))
+$(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/fs/*.c))
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/init/*.c))
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.c)) 
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.S)) 
@@ -125,6 +126,7 @@ clean:
 	@rm -rf *.ko *.o *.mod.o *.mod.c *.symvers *.order \
                .*.o.cmd .tmp_versions *.ko.cmd .*.ko.cmd \
 		mm/*.o arch/arm/*.o mm/.*.o.*  \
+		fs/*.o fs/.*.o.*  \
 		arch/arm/.*.o.* init/*.o modules/buddy/*.o \
 		modules/buddy/.*.cmd modules/bootmem/*.o \
 		modules/bootmem/.*.cmd \

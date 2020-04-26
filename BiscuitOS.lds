@@ -54,4 +54,11 @@ SECTIONS {
 			*(.vmalloc_data_bs)
 		vmalloc_section_end_bs = .;
 	}
+
+	/* Init call */
+	.init_bs : {
+		module_section_start_bs = .;
+			*(.module_data_bs)
+		module_section_end_bs = .;
+	}
 }

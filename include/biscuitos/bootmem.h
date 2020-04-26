@@ -65,4 +65,27 @@ extern void __init reserve_bootmem_bs(unsigned long addr, unsigned long size);
 extern unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat);
 extern void __init free_bootmem_bs(unsigned long addr, unsigned long size);
 
+extern void *__init alloc_large_system_hash_bs(const char *tablename,
+				unsigned long bucketsize,
+				unsigned long numentries,
+				int scale,
+				int flags,
+				unsigned int *_hash_shift,
+				unsigned int *_hash_mask,
+				unsigned long limit);
+
+#define HASH_HIGHMEM_BS	0x00000001	/* Consider highmem? */
+#define HASH_EARLY_BS	0x00000002	/* Allocating during early boot? */
+
+/* Only NUMA needs hash distribution.
+ * IA64 is known to have sufficient vmalloc space.
+ */
+#if defined(CONFIG_NUMA) && defined(CONFIG_IA64)
+#define HASHDIST_DEFAULT_BS	1
+#else
+#define HASHDIST_DEFAULT_BS	0
+#endif
+extern int __initdata hashdist_bs; /* Distribute hashes across NUMA nodes? */
+
+
 #endif

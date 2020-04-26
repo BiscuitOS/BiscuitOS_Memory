@@ -28,6 +28,7 @@ DEBUG_DATA_T(bootmem);
 DEBUG_DATA_T(buddy);
 DEBUG_DATA_T(slab);
 DEBUG_DATA_T(vmalloc);
+DEBUG_DATA_T(module);
 
 /* FIXME: BiscuitOS initall */
 
@@ -50,5 +51,10 @@ DEBUG_DATA_T(vmalloc);
 	static vmalloc_entry_t_bs __vmalloc_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".vmalloc_data_bs"))) = fn
+
+#define module_initcall_bs(fn)						\
+	static module_entry_t_bs __module_entry_##fn			\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".module_data_bs"))) = fn
 
 #endif

@@ -45,7 +45,9 @@
 				 __GFP_NO_GROW_BS | __GFP_COMP_BS | \
 				 __GFP_NOMEMALLOC_BS)
 
+#define GFP_ATOMIC_BS		(__GFP_HIGH_BS)
 #define GFP_KERNEL_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
+#define GFP_USER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */

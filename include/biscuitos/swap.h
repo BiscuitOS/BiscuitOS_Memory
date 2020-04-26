@@ -1,6 +1,8 @@
 #ifndef _BISCUITOS_SWAP_H
 #define _BISCUITOS_SWAP_H
 
+#define SWAP_CLUSTER_MAX_BS	32
+
 /*      
  * current->reclaim_state points to one of these when a task is running
  * memory reclaim
