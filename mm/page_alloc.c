@@ -1069,6 +1069,62 @@ void get_full_page_state_bs(struct page_state_bs *ret)
 	__get_page_state_bs(ret, sizeof(*ret) / sizeof(unsigned long));
 }
 
+static void *frag_start_bs(struct seq_file *m, loff_t *pos)
+{
+	pg_data_t_bs *pgdat;
+	loff_t node = *pos;
+
+	for (pgdat = pgdat_list_bs; pgdat && node; pgdat = pgdat->pgdat_next)
+		--node;
+
+	return pgdat;
+}
+
+static void *frag_next_bs(struct seq_file *m, void *arg, loff_t *pos)
+{
+	pg_data_t_bs *pgdat = (pg_data_t_bs *)arg;
+
+	(*pos)++;
+	return pgdat->pgdat_next;
+}
+
+static void frag_stop_bs(struct seq_file *m, void *arg)
+{
+}
+
+/*
+ * This walks the free areas for each zone.
+ */
+static int frag_show_bs(struct seq_file *m, void *arg)
+{
+	pg_data_t_bs *pgdat = (pg_data_t_bs *)arg;
+	struct zone_bs *zone;
+	struct zone_bs *node_zones = pgdat->node_zones;
+	unsigned long flags;
+	int order;
+
+	for (zone = node_zones; zone - node_zones < MAX_NR_ZONES_BS; ++zone) {
+		if (!zone->present_pages)
+			continue;
+
+		spin_lock_irqsave(&zone->lock, flags);
+		seq_printf(m, "Node %d, zone %8s ", 
+					pgdat->node_id, zone->name);
+		for (order = 0; order < MAX_ORDER_BS; ++order)
+			seq_printf(m, "%6lu ", zone->free_area[order].nr_free);
+		spin_unlock_irqrestore(&zone->lock, flags);
+		seq_putc(m, '\n');
+	}
+	return 0;
+}
+
+struct seq_operations fragmentation_op_bs = {
+	.start	= frag_start_bs,
+	.next	= frag_next_bs,
+	.stop	= frag_stop_bs,
+	.show	= frag_show_bs,
+};
+
 static char *vmstat_text_bs[] = {
 	"nr_dirty",
 	"nr_writeback",
@@ -1393,9 +1449,9 @@ void *__init alloc_large_system_hash_bs(const char *tablename,
 
 	printk("%s hash table entries: %d (order: %d, %lu bytes)\n",
 		tablename,
-		(1U << log2qty,
+		(1U << log2qty),
 		long_log2_bs(size) - PAGE_SHIFT_BS,
-		size));
+		size);
 
 	if (_hash_shift)
 		*_hash_shift = log2qty;
