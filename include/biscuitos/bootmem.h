@@ -43,15 +43,26 @@ extern void * __init __alloc_bootmem_bs(unsigned long,
 extern void * __init __alloc_bootmem_node_bs(pg_data_t_bs *, 
 	unsigned long, unsigned long, unsigned long);
 
-#define alloc_bootmem_bs(x) \
-	__alloc_bootmem_bs((x), SMP_CACHE_BYTES_BS, \
-						__pa_bs(MAX_DMA_ADDRESS_BS))
-#define alloc_bootmem_node_bs(pgdat, x) \
-	__alloc_bootmem_node_bs((pgdat), (x), SMP_CACHE_BYTES_BS, \
-						__pa_bs(MAX_DMA_ADDRESS_BS))
-#define alloc_bootmem_low_pages_bs(x) \
+#ifndef CONFIG_HAVE_ARCH_BOOTMEM_NODE
+extern void __init reserve_bootmem_bs(unsigned long addr, unsigned long size);
+#endif
+
+#define alloc_bootmem_bs(x)						\
+	__alloc_bootmem_bs((x), SMP_CACHE_BYTES_BS,			\
+					__pa_bs(MAX_DMA_ADDRESS_BS))
+#define alloc_bootmem_low_bs(x)						\
+	__alloc_bootmem_bs((x), SMP_CACHE_BYTES_BS, 0)
+
+#define alloc_bootmem_node_bs(pgdat, x)					\
+	__alloc_bootmem_node_bs((pgdat), (x), SMP_CACHE_BYTES_BS,	\
+					__pa_bs(MAX_DMA_ADDRESS_BS))
+#define alloc_bootmem_low_pages_bs(x)					\
 	__alloc_bootmem_bs((x), PAGE_SIZE_BS, 0)
 
+#define alloc_bootmem_pages_bs(x)					\
+	__alloc_bootmem_bs((x), PAGE_SIZE, __pa_bs(MAX_DMA_ADDRESS_BS))
+
 extern unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat);
+extern void __init free_bootmem_bs(unsigned long addr, unsigned long size);
 
 #endif

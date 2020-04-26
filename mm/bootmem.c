@@ -252,6 +252,11 @@ found:
 	return ret;
 }
 
+void __init free_bootmem_bs(unsigned long addr, unsigned long size)
+{
+	free_bootmem_core_bs(NODE_DATA_BS(0)->bdata, addr, size);
+}
+
 static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 {
 	struct page_bs *page;
@@ -381,3 +386,10 @@ unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat)
 {
 	return (free_all_bootmem_core_bs(pgdat));
 }
+
+#ifndef CONFIG_HAVE_ARCH_BOOTMEM_NODE
+void __init reserve_bootmem_bs(unsigned long addr, unsigned long size)
+{
+	reserve_bootmem_core_bs(NODE_DATA_BS(0)->bdata, addr, size);
+}
+#endif
