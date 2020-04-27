@@ -57,4 +57,27 @@ DEBUG_DATA_T(module);
 	__attribute__((__used__))					\
 	__attribute__((__section__(".module_data_bs"))) = fn
 
+struct obs_kernel_param_bs {
+	const char *str;
+	int (*setup_func)(char *);
+	int early;
+};
+
+/*      
+ * Only for really core code.  See moduleparam.h for the normal way.
+ *      
+ * Force the alignment so the compiler doesn't space elements of the
+ * obs_kernel_param "array" too far apart in .init.setup.
+ */
+#define __setup_param_bs(str, unique_id, fn, early)			\
+	static char __setup_str_##unique_id_bs[] __initdata = str;	\
+	static struct obs_kernel_param_bs __setup_##unique_id_bs	\
+		__attribute__((__used__))				\
+		__attribute__((__section__(".init.setup_bs")))		\
+		__attribute__((aligned((sizeof(long)))))		\
+		= { __setup_str_##unique_id_bs, fn, early }
+
+#define __setup_bs(str, fn)						\
+	__setup_param_bs(str, fn, fn, 0)				\
+
 #endif

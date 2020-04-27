@@ -35,7 +35,7 @@ extern void __init init_default_cache_policy_bs(unsigned long pmd);
  * already provide the required functionality.
  */
 extern struct proc_info_list *lookup_processor_type_bs(unsigned int);
-extern const char cmdline_dts[COMMAND_LINE_SIZE_BS];
+extern char cmdline_dts[COMMAND_LINE_SIZE_BS];
 
 static struct meminfo meminfo_bs = { 0, };
 struct meminfo highmeminfo_bs = { 0, };

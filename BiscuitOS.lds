@@ -14,6 +14,11 @@ SECTIONS {
 		__early_begin_bs = .;
 			*(__early_param_bs)
 		__early_end_bs = .;
+		__start___param_bs = .;
+		__setup_start_bs = .;
+			*(.init.setup_bs)
+		__setup_end_bs = .;
+		__stop___param_bs = .;
 	}
 
 	. = ALIGN(16);
@@ -48,6 +53,7 @@ SECTIONS {
 		slab_section_end_bs = .;
 	}
 
+	. = ALIGN(16);
 	/* Vmalloc */
 	.vmalloc_bs : {
 		vmalloc_section_start_bs = .;
@@ -55,8 +61,9 @@ SECTIONS {
 		vmalloc_section_end_bs = .;
 	}
 
+	. = ALIGN(16);
 	/* Init call */
-	.init_bs : {
+	.init_bs 0 : {
 		module_section_start_bs = .;
 			*(.module_data_bs)
 		module_section_end_bs = .;

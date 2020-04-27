@@ -1379,6 +1379,18 @@ module_initcall_bs(init_per_zone_pages_min_bs);
 
 __initdata int hashdist_bs = HASHDIST_DEFAULT_BS;
 
+#ifndef CONFIG_NUMA
+static int __init set_hashdist_bs(char *str)
+{
+	printk("AAAAAAAAAA\n\n\n\n");
+	if (!str)
+		return 0;
+	hashdist_bs = simple_strtoul(str, &str, 0);
+	return 1;
+}
+__setup_bs("hashdist_bs=", set_hashdist_bs);
+#endif
+
 /*
  * allocate a large system hash table from bootmem
  * - it is assumed that the hash table must contain an exact power-of-2

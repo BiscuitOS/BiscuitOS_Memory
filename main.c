@@ -65,7 +65,7 @@ int BiscuitOS_debug = 0;
 EXPORT_SYMBOL_GPL(BiscuitOS_debug);
 
 /* Command line from DTS */
-const char cmdline_dts[COMMAND_LINE_SIZE_BS];
+char cmdline_dts[COMMAND_LINE_SIZE_BS];
 /* FIXME: TLB information: From ARMv7 Hard-Code */
 unsigned long BiscuitOS_tlb_flags = 0xd0091010;
 
@@ -83,7 +83,9 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *mem;
+	char tmp_cmdline[128];
 	const phandle *ph;
+	const char *string;
 	u32 array[8];
 	int ret;
 
@@ -164,8 +166,15 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	/* Obtain cmdline information */
+	ret = of_property_read_string(np, "cmdline", &string);	
+	if (ret) {
+		printk("Unable to read cmdline information.\n");
+		return -EINVAL;
+	}
+
 	/* Calculate memory map */
-	sprintf((char *)cmdline_dts, 
+	sprintf((char *)tmp_cmdline, 
 #ifndef CONFIG_HIGHMEM_BS
 		"mem_bs=%#lx@%#lx", 
 		(unsigned long)BiscuitOS_dma_size + BiscuitOS_normal_size,
@@ -178,8 +187,13 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		(unsigned long)(BiscuitOS_ram_base +
 				BiscuitOS_dma_size + BiscuitOS_normal_size));
 #endif
-
-
+	if (!string) {
+		strcpy(cmdline_dts, tmp_cmdline);
+	} else {
+		strcpy(cmdline_dts, string);
+		strcat((char *)cmdline_dts, " ");
+		strcat((char *)cmdline_dts, tmp_cmdline);
+	}
 
 	/* Obtain kernel image information */
 	ret = of_property_read_u32_array(mem, "kernel-image", array, 8);
