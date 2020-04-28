@@ -42,6 +42,8 @@ extern struct obs_kernel_param_bs __setup_start_bs[], __setup_end_bs[];
 /* Untouched command line (eg. for /proc) saved by arch-specific code. */
 char saved_command_line_bs[COMMAND_LINE_SIZE_BS];
 
+DEBUG_FUNC_T(percpu);
+
 static void __init setup_per_cpu_areas_bs(void)
 {
 	unsigned long size, i;
@@ -63,6 +65,9 @@ static void __init setup_per_cpu_areas_bs(void)
 		memcpy(ptr, __per_cpu_start_bs, 
 				__per_cpu_end_bs - __per_cpu_start_bs);
 	}
+
+	/* FIXME: Debug percpu stuf */
+	DEBUG_CALL(percpu);
 }
 
 /* Check for early params. */

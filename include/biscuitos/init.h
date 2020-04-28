@@ -25,6 +25,7 @@ static void inline name##_debug_entry(void)				\
  * Used for initiailzation calls...
  */
 DEBUG_DATA_T(bootmem);
+DEBUG_DATA_T(percpu);
 DEBUG_DATA_T(buddy);
 DEBUG_DATA_T(slab);
 DEBUG_DATA_T(vmalloc);
@@ -40,6 +41,11 @@ DEBUG_DATA_T(login);
 	static bootmem_entry_t_bs __bootmem_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".bootmem_data_bs"))) = fn
+
+#define percpu_initcall_bs(fn)						\
+	static percpu_entry_t_bs __percpu_entry_##fn			\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".percpu_data_bs"))) = fn
 
 #define buddy_initcall_bs(fn)						\
 	static buddy_entry_t_bs __buddy_entry_##fn			\

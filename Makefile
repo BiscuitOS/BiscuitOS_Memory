@@ -42,6 +42,8 @@ $(MODULE_NAME)-m	+= modules/slab/main.o
 # obj-m			+= $(MODULE_NAME)-vmalloc.o
 # $(MODULE_NAME)-vmalloc-m	:= modules/vmalloc/module.o
 $(MODULE_NAME)-m	+= modules/vmalloc/main.o
+#  4) PERCPU
+$(MODULE_NAME)-m	+= modules/percpu/main.o
 
 
 # LD-scripts

@@ -35,6 +35,9 @@ SECTIONS {
 		__per_cpu_start_bs = .;
 			*(.data.percpu_bs)
 		__per_cpu_end_bs = .;
+		percpu_section_start_bs = .;
+			*(.percpu_data_bs)
+		percpu_section_end_bs = .;
 	}
 
 	. = ALIGN(16);
