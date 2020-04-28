@@ -73,6 +73,14 @@ SECTIONS {
 	}
 
 	. = ALIGN(16);
+	/* Kmap */
+	.kmap_bs : {
+		kmap_section_start_bs = .;
+			*(.kmap_data_bs)
+		kmap_section_end_bs = .;
+	}
+
+	. = ALIGN(16);
 	/* Init call */
 	.init_bs 0 : {
 		module_section_start_bs = .;

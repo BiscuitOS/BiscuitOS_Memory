@@ -110,7 +110,7 @@ static int TestCase_alloc_page_from_highmem_PCP(void)
 }
 
 /* Module initialize entry */
-static int __init Buddy_Allocator_init(void)
+static int __init PCP_Allocator_init(void)
 {
 	TestCase_alloc_page_from_DMA_PCP();
 	TestCase_alloc_page_from_normal_PCP();
@@ -120,12 +120,12 @@ static int __init Buddy_Allocator_init(void)
 }
 
 /* Module exit entry */
-static void __exit Buddy_Allocator_exit(void)
+static void __exit PCP_Allocator_exit(void)
 {
 }
 
-module_init(Buddy_Allocator_init);
-module_exit(Buddy_Allocator_exit);
+module_init(PCP_Allocator_init);
+module_exit(PCP_Allocator_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("BiscuitOS <buddy.zhang@aliyun.com>");

@@ -30,24 +30,28 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)
 ## Memory Allocator Test Code
 #  0) bootmem
 $(MODULE_NAME)-m	+= modules/bootmem/main.o
-#  1) Buddy
+#  2) PERCPU
+$(MODULE_NAME)-m	+= modules/percpu/main.o
+#  3) Buddy
 # obj-m			+= $(MODULE_NAME)-buddy.o
 # $(MODULE_NAME)-buddy-m	:= modules/buddy/module.o
 $(MODULE_NAME)-m	+= modules/buddy/main.o
-#  2) Slab
-# obj-m			+= $(MODULE_NAME)-slab.o
-# $(MODULE_NAME)-slab-m	:= modules/slab/module.o
-$(MODULE_NAME)-m	+= modules/slab/main.o
-#  3) VMALLOC
-# obj-m			+= $(MODULE_NAME)-vmalloc.o
-# $(MODULE_NAME)-vmalloc-m	:= modules/vmalloc/module.o
-$(MODULE_NAME)-m	+= modules/vmalloc/main.o
-#  4) PERCPU
-$(MODULE_NAME)-m	+= modules/percpu/main.o
-#  5) PCP: hot-cold
+#  4) PCP: hot-cold
 # obj-m			+= $(MODULE_NAME)-pcp.o
 # $(MODULE_NAME)-pcp-m	:= modules/pcp/module.o
 $(MODULE_NAME)-m	+= modules/pcp/main.o
+#  5) Slab
+# obj-m			+= $(MODULE_NAME)-slab.o
+# $(MODULE_NAME)-slab-m	:= modules/slab/module.o
+$(MODULE_NAME)-m	+= modules/slab/main.o
+#  6) VMALLOC
+# obj-m			+= $(MODULE_NAME)-vmalloc.o
+# $(MODULE_NAME)-vmalloc-m	:= modules/vmalloc/module.o
+$(MODULE_NAME)-m	+= modules/vmalloc/main.o
+#  7) kmap
+# obj-m			+= $(MODULE_NAME)-kmap.o
+# $(MODULE_NAME)-kmap-m	:= modules/kmap/module.o
+$(MODULE_NAME)-m	+= modules/kmap/main.o
 
 
 # LD-scripts
