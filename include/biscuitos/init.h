@@ -27,6 +27,7 @@ static void inline name##_debug_entry(void)				\
 DEBUG_DATA_T(bootmem);
 DEBUG_DATA_T(percpu);
 DEBUG_DATA_T(buddy);
+DEBUG_DATA_T(pcp);
 DEBUG_DATA_T(slab);
 DEBUG_DATA_T(vmalloc);
 DEBUG_DATA_T(module);
@@ -51,6 +52,11 @@ DEBUG_DATA_T(login);
 	static buddy_entry_t_bs __buddy_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".buddy_data_bs"))) = fn
+
+#define pcp_initcall_bs(fn)						\
+	static pcp_entry_t_bs __pcp_entry_##fn				\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".pcp_data_bs"))) = fn
 
 #define slab_initcall_bs(fn)						\
 	static slab_entry_t_bs __slab_entry_##fn			\

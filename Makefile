@@ -47,7 +47,7 @@ $(MODULE_NAME)-m	+= modules/percpu/main.o
 #  5) PCP: hot-cold
 # obj-m			+= $(MODULE_NAME)-pcp.o
 # $(MODULE_NAME)-pcp-m	:= modules/pcp/module.o
-# $(MODULE_NAME)-m	+= modules/pcp/main.o
+$(MODULE_NAME)-m	+= modules/pcp/main.o
 
 
 # LD-scripts

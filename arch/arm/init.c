@@ -459,6 +459,7 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc_bs *mdesc)
 
 /* FIXME: BiscuitOS buddy debug stuf */
 DEBUG_FUNC_T(buddy);
+DEBUG_FUNC_T(pcp);
 
 /*
  * mem_init() marks the free areas in the mem_map and tells us how much
@@ -531,4 +532,5 @@ void __init mem_init_bs(void)
 	/* FIXME: buddy_initcall entry, used to debug buddy,
 	 * This code isn't default code */
 	DEBUG_CALL(buddy);
+	DEBUG_CALL(pcp);
 }

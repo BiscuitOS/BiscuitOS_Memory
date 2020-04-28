@@ -49,6 +49,14 @@ SECTIONS {
 	}
 
 	. = ALIGN(16);
+	/* PCP */
+	.pcp_bs : {
+		pcp_section_start_bs = .;
+			*(.pcp_data_bs)
+		pcp_section_end_bs = .;
+	}
+
+	. = ALIGN(16);
 	/* Slab */
 	.slab_bs : {
 		slab_section_start_bs = .;
