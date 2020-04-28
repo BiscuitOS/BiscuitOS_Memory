@@ -31,7 +31,7 @@ static int TestCase_vmalloc(void)
 		return -ENOMEM;
 	}
 	sprintf(addr, "BiscuitOS VMALLOC Module");
-	bs_debug("%s\n", (char *)addr);
+	printk("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
 	/* free */
 	vfree_bs(addr);

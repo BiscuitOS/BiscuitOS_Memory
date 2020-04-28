@@ -23,5 +23,10 @@ void *vmalloc_bs(unsigned long size);
 void vfree_bs(void *addr);
 void *__vmalloc_bs(unsigned long size, unsigned int __nocast gfp_mask, 
                                                         pgprot_t_bs prot);
+void vunmap_bs(void *addr);
+void *vmap_bs(struct page_bs **, unsigned int, unsigned long, pgprot_t_bs);
+
+extern void *vmalloc_32_bs(unsigned long size);
+extern void *vmalloc_exec_bs(unsigned long size);
 
 #endif

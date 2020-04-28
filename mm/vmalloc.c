@@ -371,6 +371,55 @@ void __vunmap_bs(void *addr, int deallocate_pages)
 	return;
 }
 
+/**
+ *      vunmap  -  release virtual mapping obtained by vmap()
+ *
+ *      @addr:          memory base address
+ *
+ *      Free the virtually contiguous memory area starting at @addr,
+ *      which was created from the page array passed to vmap().
+ *
+ *      May not be called in interrupt context.
+ */
+void vunmap_bs(void *addr)
+{
+	BUG_ON_BS(in_interrupt());
+	__vunmap_bs(addr, 0);
+}
+EXPORT_SYMBOL_GPL(vunmap_bs);
+
+/**
+ *      vmap  -  map an array of pages into virtually contiguous space
+ *
+ *      @pages:         array of page pointers
+ *      @count:         number of pages to map
+ *      @flags:         vm_area->flags
+ *      @prot:          page protection for the mapping
+ *
+ *      Maps @count pages from @pages into contiguous kernel virtual
+ *      space.
+ */
+void *vmap_bs(struct page_bs **pages, unsigned int count,
+				unsigned long flags, pgprot_t_bs prot)
+{
+	struct vm_struct_bs *area;
+
+	if (count > num_physpages_bs)
+		return NULL;
+
+	area = get_vm_area_bs((count << PAGE_SHIFT_BS), flags);
+	if (!area)
+		return NULL;
+
+	if (map_vm_area_bs(area, prot, &pages)) {
+		vunmap_bs(area->addr);
+		return NULL;
+	}
+
+	return area->addr;
+}
+EXPORT_SYMBOL_GPL(vmap_bs);
+
 /**             
  *      vfree  -  release memory allocated by vmalloc()
  *
@@ -431,3 +480,113 @@ void *vmalloc_bs(unsigned long size)
 					PAGE_KERNEL_BS);
 }
 EXPORT_SYMBOL_GPL(vmalloc_bs);
+
+/**
+ *      vmalloc_32  -  allocate virtually contiguous memory (32bit addressable)
+ *
+ *      @size:          allocation size
+ *
+ *      Allocate enough 32bit PA addressable pages to cover @size from the
+ *      page level allocator and map them into contiguous kernel virtual space.
+ */
+void *vmalloc_32_bs(unsigned long size)
+{
+	return __vmalloc_bs(size, GFP_KERNEL_BS, PAGE_KERNEL_BS);
+}
+EXPORT_SYMBOL_GPL(vmalloc_32_bs);
+
+#ifndef PAGE_KERNEL_EXEC_BS
+#define PAGE_KERNEL_EXEC_BS	PAGE_KERNEL_BS
+#endif
+/**
+ *      vmalloc_exec  -  allocate virtually contiguous, executable memory
+ *
+ *      @size:          allocation size
+ *
+ *      Kernel-internal function to allocate enough pages to cover @size
+ *      the page level allocator and map them into contiguous and
+ *      executable kernel virtual space.
+ *
+ *      For tight cotrol over page level allocator and protection flags
+ *      use __vmalloc() instead.
+ */
+void *vmalloc_exec_bs(unsigned long size)
+{
+	return __vmalloc_bs(size, GFP_KERNEL_BS | __GFP_HIGHMEM_BS, 
+					PAGE_KERNEL_EXEC_BS);
+}
+
+long vread_bs(char *buf, char *addr, unsigned long count)
+{
+	struct vm_struct_bs *tmp;
+	char *vaddr, *buf_start = buf;
+	unsigned long n;
+
+	/* Don't allow overflow */
+	if ((unsigned long)addr + count < count)
+		count = -(unsigned long)addr;
+
+	read_lock(&vmlist_lock_bs);
+	for (tmp = vmlist_bs; tmp; tmp = tmp->next) {
+		vaddr = (char *)tmp->addr;
+		if (addr >= vaddr + tmp->size - PAGE_SIZE_BS)
+			continue;
+		while (addr < vaddr) {
+			if (count == 0)
+				goto finished;
+			*buf = '\0';
+			buf++;
+			addr++;
+			count--;
+		}
+		n = vaddr + tmp->size - PAGE_SIZE_BS - addr;
+		do {
+			if (count == 0)
+				goto finished;
+			*buf = *addr;
+			buf++;
+			addr++;
+			count--;
+		} while (--n > 0);
+	}
+finished:
+	read_unlock(&vmlist_lock_bs);
+	return buf - buf_start;
+}
+
+long vwrite_bs(char *buf, char *addr, unsigned long count)
+{
+	struct vm_struct_bs *tmp;
+	char *vaddr, *buf_start = buf;
+	unsigned long n;
+
+	/* Don't allow overflow */
+	if ((unsigned long)addr + count < count)
+		count -= (unsigned long) addr;
+
+	read_lock(&vmlist_lock_bs);
+	for (tmp = vmlist_bs; tmp; tmp = tmp->next) {
+		vaddr = (char *)tmp->addr;
+		if (addr >= vaddr + tmp->size - PAGE_SIZE_BS)
+			continue;
+		while (addr < vaddr) {
+			if (count == 0)
+				goto finished;
+			buf++;
+			addr++;
+			count--;
+		}
+		n = vaddr + tmp->size - PAGE_SIZE_BS - addr;
+		do {
+			if (count == 0)
+				goto finished;
+			*addr = *buf;
+			buf++;
+			addr++;
+			count--;
+		} while (--n > 0);
+	}
+finished:
+	read_unlock(&vmlist_lock_bs);
+	return buf - buf_start;
+}
