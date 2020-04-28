@@ -7,6 +7,10 @@ typedef struct kmem_cache_s_bs kmem_cache_t_bs;
 #include "biscuitos/gfp.h"
 
 /* flags for kmem_cache_alloc() */
+#define SLAB_NOFS_BS		GFP_NOFS_BS
+#define SLAB_NOIO_BS		GFP_NOIO_BS
+#define SLAB_ATOMIC_BS		GFP_ATOMIC_BS
+#define SLAB_USER_BS		GFP_USER_BS
 #define SLAB_KERNEL_BS		GFP_KERNEL_BS
 #define SLAB_DMA_BS		GFP_DMA_BS
 
@@ -57,6 +61,8 @@ kmem_cache_create_bs(const char *name, size_t size, size_t align,
 		unsigned long flags,
 		void (*ctor)(void *, kmem_cache_t_bs *, unsigned long),
 		void (*dtor)(void *, kmem_cache_t_bs *, unsigned long));
+extern int kmem_cache_destroy_bs(kmem_cache_t_bs *cachep);
+extern int kmem_cache_shrink_bs(kmem_cache_t_bs *cachep);
 
 static inline void *kmalloc_bs(size_t size, unsigned int __nocast flags)
 {
@@ -82,4 +88,11 @@ static inline void *kmalloc_node_bs(size_t size, int flags, int node)
 	return kmalloc_bs(size, flags);
 }
 
+static inline void *kmem_cache_alloc_node_bs(kmem_cache_t_bs *cachep,
+				int flags, int node)
+{
+	return kmem_cache_alloc_bs(cachep, flags);
+}
+
+extern int FASTCALL_BS(kmem_ptr_validate_bs(kmem_cache_t_bs *, void *));
 #endif

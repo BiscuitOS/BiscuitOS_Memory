@@ -95,4 +95,7 @@ struct obs_kernel_param_bs {
 #define __setup_bs(str, fn)						\
 	__setup_param_bs(str, fn, fn, 0)				\
 
+#define __devinit		__init
+#define __initcall_bs(x)	
+
 #endif

@@ -553,4 +553,8 @@ typedef void (*cpu_set_pte_ext_t)(pte_t_bs *, pte_t_bs, unsigned int);
 
 #endif
 
+/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
+/* FIXME: this is not correct */
+#define kern_addr_valid_bs(addr)	(1)
+
 #endif

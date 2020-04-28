@@ -84,16 +84,23 @@
 #include <linux/rculist.h>
 #include <linux/jiffies.h>
 #include <linux/semaphore.h>
+#include <linux/seq_file.h>
+#include <linux/notifier.h>
+#include <linux/workqueue.h>
 #include <asm/uaccess.h>
 #include "biscuitos/kernel.h"
 #include "asm-generated/page.h"
 #include "biscuitos/slab.h"
 #include "biscuitos/mm.h"
 #include "biscuitos/init.h"
+#include "biscuitos/cpu.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/types.h"
 #include "asm-generated/semaphore.h"
 #include "asm-generated/cputype.h"
+#include "biscuitos/percpu.h"
+#include "asm-generated/arch.h"
+#include "asm-generated/percpu.h"
 
 /*
  * DEBUG        - 1 for kmem_cache_create() to honour; SLAB_DEBUG_INITIAL,
@@ -411,6 +418,7 @@ struct kmem_cache_s_bs {
 #define STATS_INC_FREEMISS_BS(x)	atomic_inc(&(x)->freemiss)
 #define STATS_INC_GROWN_BS(x)		((x)->grown++)
 #define STATS_INC_ACTIVE_BS(x)		((x)->num_active++)
+#define STATS_INC_REAPED_BS(x)		((x)->reaped++)
 #define STATS_DEC_ACTIVE_BS(x)		((x)->num_active--)
 #define STATS_SET_HIGH_BS(x)		do {				\
 	if ((x)->num_active > (x)->high_mark)				\
@@ -423,6 +431,7 @@ struct kmem_cache_s_bs {
 #define STATS_INC_ACTIVE_BS(x)		do { } while (0)
 #define STATS_DEC_ACTIVE_BS(x)		do { } while (0)
 #define STATS_SET_HIGH_BS(x)		do { } while (0)
+#define STATS_INC_REAPED_BS(x)		do { } while (0)
 #define STATS_INC_GROWN_BS(x)		do { } while (0)
 #define STATS_INC_FREEHIT_BS(x)		do { } while (0)
 #define STATS_INC_FREEMISS_BS(x)	do { } while (0)
@@ -487,6 +496,8 @@ static enum {
 	PARTIAL_BS,
 	FULL_BS
 } g_cpucache_up_bs;
+
+static DEFINE_PER_CPU_BS(struct work_struct, reap_work_bs);
 
 struct ccupdate_struct_bs {
 	kmem_cache_t_bs *cachep;
@@ -1774,6 +1785,48 @@ kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, int gfpflags)
 EXPORT_SYMBOL_GPL(kmem_find_general_cachep_bs);
 
 /**
+ * kmem_ptr_validate - check if an untrusted pointer might
+ *      be a slab entry.
+ * @cachep: the cache we're checking against
+ * @ptr: pointer to validate
+ *
+ * This verifies that the untrusted pointer looks sane:
+ * it is _not_ a guarantee that the pointer is actually
+ * part of the slab cache in question, but it at least
+ * validates that the pointer can be dereferenced and
+ * looks half-way sane.
+ *      
+ * Currently only used for dentry validation.
+ */
+int fastcall_bs kmem_ptr_validate_bs(kmem_cache_t_bs *cachep, void *ptr)
+{
+	unsigned long addr = (unsigned long)ptr;
+	unsigned long min_addr = PAGE_OFFSET_BS;
+	unsigned long align_mask = BYTES_PER_WORD_BS - 1;
+	unsigned long size = cachep->objsize;
+	struct page_bs *page;
+
+	if (unlikely(addr < min_addr))
+		goto out;
+	if (unlikely(addr > (unsigned long)high_memory_bs - size))
+		goto out;
+	if (unlikely(addr & align_mask))
+		goto out;
+	if (unlikely(!kern_addr_valid_bs(addr)))
+		goto out;
+	if (unlikely(!kern_addr_valid_bs(addr + size - 1)))
+		goto out;
+	page = virt_to_page_bs(ptr);
+	if (unlikely(!PageSlab_bs(page)))
+		goto out;
+	if (unlikely(GET_PAGE_CACHE_BS(page) != cachep))
+		goto out;
+	return 1;
+out:
+	return 0;
+}
+
+/**
  * kmem_cache_create - Create a cache.
  * @name: A string which is used in /proc/slabinfo to identify this cache.
  * @size: The size of objects to be created in this cache.
@@ -2159,6 +2212,338 @@ static void cache_estimate_bs(unsigned long gfporder, size_t size,
 	*left_over = wastage;
 }
 
+static void drain_array_locked_bs(kmem_cache_t_bs *cachep,
+				struct array_cache_bs *ac, int force)
+{
+	int tofree;
+
+	check_spinlock_acquired_bs(cachep);
+	if (ac->touched && !force) {
+		ac->touched = 0;
+	} else if (ac->avail) {
+		tofree = force ? ac->avail : (ac->limit+4)/5;
+		if (tofree > ac->avail) {
+			tofree = (ac->avail+1)/2;
+		}
+		free_block_bs(cachep, ac_entry_bs(ac), tofree);
+		ac->avail -= tofree;
+		memmove(&ac_entry_bs(ac)[0], &ac_entry_bs(ac)[tofree],
+		sizeof(void*)*ac->avail);
+}
+}
+
+/**
+ * cache_reap - Reclaim memory from caches.
+ *
+ * Called from workqueue/eventd every few seconds.
+ * Purpose:
+ * - clear the per-cpu caches for this CPU.
+ * - return freeable pages to the main free memory pool.
+ *
+ * If we cannot acquire the cache chain semaphore then just give up - we'll
+ * try again on the next iteration.
+ */
+static void cache_reap_bs(struct work_struct *w)
+{
+	struct list_head *walk;
+
+	if (down_trylock(&cache_chain_sem_bs)) {
+		/* Give up. Setup the next iteration */
+		schedule_delayed_work(
+			(struct delayed_work *)&__get_cpu_var_bs(reap_work_bs),
+			REAPTIMEOUT_CPUC_BS + smp_processor_id());
+	}
+
+	list_for_each(walk, &cache_chain_bs) {
+		kmem_cache_t_bs *searchp;
+		struct list_head *p;
+		int tofree;
+		struct slab_bs *slabp;
+
+		searchp = list_entry(walk, kmem_cache_t_bs, next);
+
+		if (searchp->flags & SLAB_NO_REAP_BS)
+			goto next;
+
+		check_irq_on_bs();
+
+		spin_lock_irq(&searchp->spinlock);
+
+		drain_array_locked_bs(searchp, ac_data_bs(searchp), 0);
+
+		if (time_after(searchp->lists.next_reap, jiffies))
+			goto next_unlock;
+
+		searchp->lists.next_reap = jiffies + REAPTIMEOUT_LIST3_BS;
+
+		if (searchp->lists.shared)
+			drain_array_locked_bs(searchp,
+						searchp->lists.shared, 0);
+
+		if (searchp->lists.free_touched) {
+			searchp->lists.free_touched = 0;
+			goto next_unlock;
+		}
+
+		tofree = (searchp->free_limit + 5 * searchp->num - 1) /
+					(5 * searchp->num);
+
+		do {
+			p = list3_data_bs(searchp)->slabs_free.next;
+			if (p == &(list3_data_bs(searchp)->slabs_free))
+				break;
+
+			slabp = list_entry(p, struct slab_bs, list);
+			BUG_ON_BS(slabp->inuse);
+			list_del(&slabp->list);
+			STATS_INC_REAPED_BS(searchp);
+
+			/* Safe to drop the lock. The slab is no longer
+			 * linked to the cache.
+			 * searchp cannot disappear, we hold
+			 * cache_chain_lock
+			 */
+			searchp->lists.free_objects -= searchp->num;
+			spin_unlock_irq(&searchp->spinlock);
+			slab_destroy_bs(searchp, slabp);
+			spin_lock_irq(&searchp->spinlock);
+		} while (--tofree > 0);
+next_unlock:
+		spin_unlock_irq(&searchp->spinlock);
+next:
+		cond_resched();
+	}
+	check_irq_on_bs();
+	up(&cache_chain_sem_bs);
+	/* Setup the next iteration */
+	schedule_delayed_work(
+			(struct delayed_work *)&__get_cpu_var_bs(reap_work_bs), 
+			REAPTIMEOUT_CPUC_BS + smp_processor_id());
+}
+
+/*
+ * Initiate the reap timer running on the target CPU.  We run at around 1 to 2Hz
+ * via the workqueue/eventd.
+ * Add the CPU number into the expiration time to minimize the possibility of
+ * the CPUs getting into lockstep and contending for the global cache chain
+ * lock.
+ */
+static void __devinit start_cpu_timer_bs(int cpu)
+{
+	struct work_struct *reap_work = &per_cpu_bs(reap_work_bs, cpu);	
+
+	/*
+	 * When this gets called from do_initcalls via cpucache_init(),
+	 * init_workqueues() has already run, so keventd will be setup
+	 * at that time.
+	 */
+	if (reap_work->func == NULL) {
+		INIT_WORK(reap_work, cache_reap_bs);
+		schedule_delayed_work_on(cpu, 
+			(struct delayed_work *)reap_work, HZ + 3 * cpu);
+	}
+}
+
+static int __devinit cpuup_callback_bs(struct notifier_block *nfb,
+					unsigned long action, void *hcpu)
+{
+	long cpu = (long)hcpu;
+	kmem_cache_t_bs *cachep;
+
+	switch (action) {
+	case CPU_UP_PREPARE_BS:
+		down(&cache_chain_sem_bs);
+		list_for_each_entry(cachep, &cache_chain_bs, next) {
+			struct array_cache_bs *nc;
+
+			nc = alloc_arraycache_bs(cpu, cachep->limit, 
+							cachep->batchcount);
+			if (!nc)
+				goto bad;
+			spin_lock_irq(&cachep->spinlock);
+			cachep->array[cpu] = nc;
+			cachep->free_limit = (1 + num_online_cpus()) * 
+					cachep->batchcount + cachep->num;
+			spin_unlock_irq(&cachep->spinlock);
+		}
+		up(&cache_chain_sem_bs);
+		break;
+	case CPU_ONLINE_BS:
+		start_cpu_timer_bs(cpu);
+		break;
+#ifdef CONFIG_HOTPLUG_CPU
+	case CPU_DEAD_BS:
+		/* fall thru */
+	case CPU_UP_CANCELED_BS:
+		down(&cache_chain_sem_bs);
+
+		list_for_each_entry(cachep, &cache_chain_bs, next) {
+			struct array_cache_bs *nc;
+
+			spin_lock_irq(&cachep->spinlock);
+			/* cpu is dead; no one can alloc from it. */
+			nc = cachep->array[cpu];
+			cachep->array[cpu] = NULL;
+			cachep->free_limit -= cachep->batchcount;
+			free_block_bs(cachep, ac_entry_bs(nc), nc->avail);
+			spin_unlock_irq(&cachep->spinlock);
+			kfree_bs(nc);
+		}
+		up(&cache_chain_sem_bs);
+		break;
+#endif
+	}
+	return NOTIFY_OK;
+
+bad:
+	up(&cache_chain_sem_bs);
+	return NOTIFY_BAD;
+}
+
+static void do_drain_bs(void *arg)
+{
+	kmem_cache_t_bs *cachep = (kmem_cache_t_bs *)arg;
+	struct array_cache_bs *ac;
+
+	check_irq_off_bs();
+	ac = ac_data_bs(cachep);
+	spin_lock(&cachep->spinlock);
+	free_block_bs(cachep, &ac_entry_bs(ac)[0], ac->avail);
+	spin_unlock(&cachep->spinlock);
+	ac->avail = 0;
+}
+
+static void drain_cpu_caches_bs(kmem_cache_t_bs *cachep)
+{
+	smp_call_function_all_cpus_bs(do_drain_bs, cachep);
+	check_irq_on_bs();
+	spin_lock_irq(&cachep->spinlock);
+	if (cachep->lists.shared)
+		drain_array_locked_bs(cachep, cachep->lists.shared, 1);
+	spin_unlock_irq(&cachep->spinlock);
+}
+
+/* NUMA shrink all list3s */
+static int __cache_shrink_bs(kmem_cache_t_bs *cachep)
+{
+	struct slab_bs *slabp;
+	int ret;
+
+	drain_cpu_caches_bs(cachep);
+
+	check_irq_on_bs();
+	spin_lock_irq(&cachep->spinlock);
+
+	for (;;) {
+		struct list_head *p;
+
+		p = cachep->lists.slabs_free.prev;
+		if (p == &cachep->lists.slabs_free)
+			break;
+
+		slabp = list_entry(cachep->lists.slabs_free.prev,
+						struct slab_bs, list);
+#if DEBUG
+		if (slabp->inuse)
+			BUS_BS();
+#endif
+		list_del(&slabp->list);
+
+		cachep->lists.free_objects -= cachep->num;
+		spin_unlock_irq(&cachep->spinlock);
+		slab_destroy_bs(cachep, slabp);
+		spin_lock_irq(&cachep->spinlock);
+	}
+	ret = !list_empty(&cachep->lists.slabs_full) ||
+		!list_empty(&cachep->lists.slabs_partial);
+	spin_unlock_irq(&cachep->spinlock);
+	return ret;
+}
+
+/**
+ * kmem_cache_destroy - delete a cache
+ * @cachep: the cache to destroy
+ *
+ * Remove a kmem_cache_t object from the slab cache.
+ * Returns 0 on success.
+ *
+ * It is expected this function will be called by a module when it is
+ * unloaded.  This will remove the cache completely, and avoid a duplicate
+ * cache being allocated each time a module is loaded and unloaded, if the
+ * module doesn't have persistent in-kernel storage across loads and unloads.
+ *
+ * The cache must be empty before calling this function.
+ *
+ * The caller must guarantee that noone will allocate memory from the cache
+ * during the kmem_cache_destroy().
+ */
+int kmem_cache_destroy_bs(kmem_cache_t_bs *cachep)
+{
+	int i;
+
+	if (!cachep || in_interrupt())
+		BUG_BS();
+
+	/* Don't let CPUs to come and go */
+	//lock_cpu_hotplug();
+
+	/* Find the cache in the chain of caches. */
+	down(&cache_chain_sem_bs);
+
+	/*
+	 * the chain is never empty, cache_cache is never destroyed
+	 */
+	list_del(&cachep->next);
+	up(&cache_chain_sem_bs);
+
+	if (__cache_shrink_bs(cachep)) {
+		slab_error_bs(cachep, "Can't free all objects");
+		down(&cache_chain_sem_bs);
+		list_add(&cachep->next, &cache_chain_bs);
+		up(&cache_chain_sem_bs);
+		//unlock_cpu_hotplug();
+		return 1;
+	}
+
+	if (unlikely(cachep->flags & SLAB_DESTROY_BY_RCU_BS))
+		synchronize_rcu();
+
+	/* no cpu_online check required here since we clear the percpu
+	 * array on cpu offline and set this to NULL.
+	 */
+	for (i = 0; i < NR_CPUS_BS; i++)
+		kfree_bs(cachep->array[i]);
+
+	/* NUMA: free the list3 structures */
+	kfree_bs(cachep->lists.shared);
+	cachep->lists.shared = NULL;
+	kmem_cache_free_bs(&cache_cache_bs, cachep);
+
+	// unlock_cpu_hotplug();
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kmem_cache_destroy_bs);
+
+/**
+ * kmem_cache_shrink - Shrink a cache.
+ * @cachep: The cache to shrink.
+ *
+ * Releases as many slabs as possible for a cache.
+ * To help debugging, a zero exit status indicates all slabs were released.
+ */
+int kmem_cache_shrink_bs(kmem_cache_t_bs *cachep)
+{
+	if (!cachep || in_interrupt())
+		BUG_BS();
+
+	return __cache_shrink_bs(cachep);
+}
+EXPORT_SYMBOL_GPL(kmem_cache_shrink_bs);
+
+static __unused struct notifier_block cpucache_notifier_bs = 
+				{ &cpuup_callback_bs, NULL, 0};
+
 /* FIXME: BiscuitOS slab debug stuf */
 DEBUG_FUNC_T(slab);
 
@@ -2292,7 +2677,194 @@ void __init kmem_cache_init_bs(void)
 	/* Done! */
 	g_cpucache_up_bs = FULL_BS;
 
+	/* Register a cpu startup notifier callback
+	 * that initializes ac_data for all new cpus
+	 */
+	register_cpu_notifier(&cpucache_notifier_bs);
+
+	/* The reap timers are started later, with a module init call:
+	 * That part of the kernel is not yet operational.
+	 */
+
 	/* FIXME: slab_initcall entry, used to debug slab,
 	 * This code isn't default code */
 	DEBUG_CALL(slab);
 }
+
+static int __init __unused cpucache_init_bs(void)
+{
+	int cpu;
+
+	/* 
+	 * Register the timers that return unneeded
+	 * pages to gfp.
+	 */
+	for (cpu = 0; cpu < NR_CPUS_BS; cpu++) {
+		if (cpu_online(cpu))
+			start_cpu_timer_bs(cpu);
+	}
+
+	return 0;
+}
+__initcall_bs(cpucache_init_bs);
+
+static void *s_start_bs(struct seq_file *m, loff_t *pos)
+{
+	loff_t n = *pos;
+	struct list_head *p;
+
+	down(&cache_chain_sem_bs);
+	if (!n) {
+		/*
+		 * Output format version, so at least we can change it
+		 * without _too_ many complaints.
+		 */
+#if STATS
+		seq_puts(m, "slabinfo - version: 2.1 (statistics)\n");
+#else           
+		seq_puts(m, "slabinfo - version: 2.1\n");
+#endif          
+		seq_puts(m, "# name            <active_objs> <num_objs> "
+				"<objsize> <objperslab> <pagesperslab>");
+		seq_puts(m, " : tunables <limit> <batchcount> <sharedfactor>");
+		seq_puts(m, " : slabdata <active_slabs> <num_slabs> "
+				"<sharedavail>");
+#if STATS
+		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> "
+				"<reaped> <error> <maxfreeable> <freelimit> "
+				"<nodeallocs>");             
+		seq_puts(m, " : cpustat <allochit> <allocmiss> <freehit> "
+				"<freemiss>");
+#endif
+		seq_putc(m, '\n');
+	}
+	p = cache_chain_bs.next;
+	while (n--) {
+		p = p->next;
+		if (p == &cache_chain_bs)
+			return NULL;
+	}
+	return list_entry(p, kmem_cache_t_bs, next);
+}
+
+static void *s_next_bs(struct seq_file *m, void *p, loff_t *pos)
+{
+	kmem_cache_t_bs *cachep = p;
+	++*pos;
+	return cachep->next.next == &cache_chain_bs ? NULL :
+		list_entry(cachep->next.next, kmem_cache_t_bs, next);
+}
+
+static void s_stop_bs(struct seq_file *m, void *p)
+{
+	up(&cache_chain_sem_bs);
+}
+
+static int s_show_bs(struct seq_file *m, void *p)
+{
+	kmem_cache_t_bs *cachep = p;
+	struct list_head *q;
+	struct slab_bs *slabp;
+	unsigned long active_objs;
+	unsigned long num_objs;
+	unsigned long active_slabs = 0;
+	unsigned long num_slabs;
+	const char *name;
+	char *error = NULL;
+
+	check_irq_on_bs();
+	spin_lock_irq(&cachep->spinlock);
+	active_objs = 0;
+	num_slabs = 0;
+	list_for_each(q, &cachep->lists.slabs_full) {
+		slabp = list_entry(q, struct slab_bs, list);
+		if (slabp->inuse != cachep->num && !error)
+			error = "slabs_full accounting error";
+		active_objs += cachep->num;
+		active_slabs++;
+	}
+	list_for_each(q, &cachep->lists.slabs_partial) {
+		slabp = list_entry(q, struct slab_bs, list);
+		if (slabp->inuse == cachep->num && !error)
+			error = "slabs_partial inuse accounting error";
+		if (!slabp->inuse && !error)
+			error = "slabs_partial/inuse accounting error";
+		active_objs += slabp->inuse;
+		active_slabs++;
+	}
+	list_for_each(q, &cachep->lists.slabs_free) {
+		slabp = list_entry(q, struct slab_bs, list);
+		if (slabp->inuse && !error)
+			error = "slabs_free/inuse accounting error";
+		num_slabs++;
+	}
+	num_slabs += active_slabs;
+	num_objs = num_slabs * cachep->num;
+	if (num_objs - active_objs != cachep->lists.free_objects && !error)
+		error = "free_objects accounting error";
+
+	name = cachep->name;
+	if (error)
+		printk(KERN_ERR "slab: cache %s error: %s\n", name, error);
+
+	seq_printf(m, "%-17s %6lu %6lu %6u %4u %4d",
+		name, active_objs, num_objs, cachep->objsize,
+		cachep->num, (1<<cachep->gfporder));
+	seq_printf(m, " : tunables %4u %4u %4u",
+		cachep->limit, cachep->batchcount,
+		cachep->lists.shared->limit/cachep->batchcount);
+	seq_printf(m, " : slabdata %6lu %6lu %6u",
+		active_slabs, num_slabs, cachep->lists.shared->avail);
+
+#if STATS
+	{	/* list3 stats */
+		unsigned long high = cachep->high_mark;
+		unsigned long allocs = cachep->num_allocations;
+		unsigned long grown = cachep->grown;
+		unsigned long reaped = cachep->reaped;
+		unsigned long errors = cachep->errors;
+		unsigned long max_freeable = cachep->max_freeable;
+		unsigned long free_limit = cachep->free_limit;
+		unsigned long node_allocs = cachep->node_allocs;
+
+		seq_printf(m, " : globalstat %7lu %6lu %5lu %4lu %4lu "
+				"%4lu %4lu %4lu",
+			allocs, high, grown, reaped, errors,
+			max_freeable, free_limit, node_allocs);
+	}
+	/* cpu stats */
+	{
+		unsigned long allochit = atomic_read(&cachep->allochit);
+		unsigned long allocmiss = atomic_read(&cachep->allocmiss);
+		unsigned long freehit = atomic_read(&cachep->freehit);
+		unsigned long freemiss = atomic_read(&cachep->freemiss);
+
+		seq_printf(m, " : cpustat %6lu %6lu %6lu %6lu",
+		allochit, allocmiss, freehit, freemiss);
+	}
+#endif
+	seq_putc(m, '\n');
+	spin_unlock_irq(&cachep->spinlock);
+	return 0;
+}
+
+/*
+ * slabinfo_op - iterator that generates /proc/slabinfo
+ *
+ * Output layout:
+ * cache-name
+ * num-active-objs
+ * total-objs
+ * object size
+ * num-active-slabs
+ * total-slabs
+ * num-pages-per-slab
+ * + further values on SMP and with statistics enabled
+ */
+struct seq_operations slabinfo_op_bs = {
+	.start	= s_start_bs,
+	.next	= s_next_bs,
+	.stop	= s_stop_bs,
+	.show	= s_show_bs,
+};
+
