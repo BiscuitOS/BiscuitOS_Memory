@@ -67,5 +67,8 @@ SECTIONS {
 		module_section_start_bs = .;
 			*(.module_data_bs)
 		module_section_end_bs = .;
+		login_section_start_bs = .;
+			*(.login_data_bs)
+		login_section_end_bs = .;
 	}
 }

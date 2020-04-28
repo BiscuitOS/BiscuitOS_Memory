@@ -108,6 +108,191 @@ static void __init alloc_node_mem_map_bs(struct pglist_data_bs *pgdat)
 #endif
 }
 
+#ifdef CONFIG_NUMA
+static void show_node_bs(struct zone *zone)
+{
+	printk("Node %d ", zone->zone_pgdat->node_id);
+}
+#else
+#define show_node_bs(zone)	do { } while (0)
+#endif
+
+void __get_page_state_bs(struct page_state_bs *ret, int nr);
+
+void get_page_state_bs(struct page_state_bs *ret)
+{
+	int nr;
+
+	nr = offsetof(struct page_state_bs, GET_PAGE_STATE_LAST_BS);
+	nr /= sizeof(unsigned long);
+
+	__get_page_state_bs(ret, nr + 1);
+}
+
+void __get_zone_counts_bs(unsigned long *active, unsigned long *inactive,
+		unsigned long *free, struct pglist_data_bs *pgdat)
+{
+	struct zone_bs *zones = pgdat->node_zones;
+	int i;
+
+	*active = 0;
+	*inactive = 0;
+	*free = 0;
+
+	for (i = 0; i < MAX_NR_ZONES_BS; i++) {
+		*active += zones[i].nr_active;
+		*inactive += zones[i].nr_inactive;
+		*free += zones[i].free_pages;
+	}
+}
+
+void get_zone_counts_bs(unsigned long *active,
+		unsigned long *inactive, unsigned long *free)
+{
+	struct pglist_data_bs *pgdat;
+
+	*active = 0;
+	*inactive = 0;
+	*free = 0;
+
+	for_each_pgdat_bs(pgdat) {
+		unsigned long l, m, n;
+
+		__get_zone_counts_bs(&l, &m, &n, pgdat);
+		*active += l;
+		*inactive += m;
+		*free += n;
+	}
+}
+
+#ifdef CONFIG_HIGHMEM_BS
+unsigned int nr_free_highpages_bs(void)
+{
+	pg_data_t_bs *pgdat;
+	unsigned int pages = 0;
+
+	for_each_pgdat_bs(pgdat)
+		pages += pgdat->node_zones[ZONE_HIGHMEM_BS].free_pages;
+
+	return pages;
+}
+#endif
+
+#define K_BS(x)	((x) << (PAGE_SHIFT_BS-10))
+
+/*
+ * Show free area list (used inside shift_scroll-lock stuff)
+ * We also calculate the percentage fragmentation. We do this by counting the
+ * memory on each free list with the exception of the first item on the list.
+ */
+void show_free_areas_bs(void)
+{
+	struct page_state_bs ps;
+	int cpu, temperature;
+	unsigned long active;
+	unsigned long inactive;
+	unsigned long free;
+	struct zone_bs *zone;
+
+	for_each_zone_bs(zone) {
+		show_node_bs(zone);
+		printk("%s per-cpu:", zone->name);
+
+		if (!zone->present_pages) {
+			printk(" empty\n");
+			continue;
+		} else
+			printk("\n");
+
+		for (cpu = 0; cpu < NR_CPUS_BS; ++cpu) {
+			struct per_cpu_pageset_bs *pageset;
+
+			if (!cpu_possible(cpu))
+				continue;
+
+			pageset = zone->pageset + cpu;
+
+			for (temperature = 0; temperature < 2; temperature++)
+				printk("cpu %d %s: low %d, high %d, batch %d\n",
+					cpu,
+					temperature ? "cold" : "hot",
+					pageset->pcp[temperature].low,
+					pageset->pcp[temperature].high,
+					pageset->pcp[temperature].batch);
+		}
+	}
+	get_page_state_bs(&ps);
+	get_zone_counts_bs(&active, &inactive, &free);
+
+	printk("\nFree pages: %11ukB (%ukB HighMem)\n",
+			K_BS(nr_free_pages_bs()),
+			K_BS(nr_free_highpages_bs()));
+
+	printk("Active:%lu inactive:%lu dirty:%lu writeback:%lu "
+		"unstable:%lu free:%u slab:%lu mapped:%lu pagetables:%lu\n",
+		active,
+		inactive,
+		ps.nr_dirty,
+		ps.nr_writeback,
+		ps.nr_unstable,
+		nr_free_pages_bs(),
+		ps.nr_slab,
+		ps.nr_mapped,
+		ps.nr_page_table_pages);
+
+	for_each_zone_bs(zone) {
+		int i;
+
+		show_node_bs(zone);
+		printk("%s"
+			" free:%lukB"
+			" min:%lukB"
+			" low:%lukB"
+			" high:%lukB"
+			" active:%lukB"
+			" inactive:%lukB"
+			" present:%lukB"
+			" pages_scanned:%lukB"
+			" all_unreclaimable? %s"
+			"\n",
+			zone->name,
+			K_BS(zone->free_pages),
+			K_BS(zone->pages_min),
+			K_BS(zone->pages_low),
+			K_BS(zone->pages_high),
+			K_BS(zone->nr_active),
+			K_BS(zone->nr_inactive),
+			K_BS(zone->present_pages),
+			zone->pages_scanned,
+			(zone->all_unreclaimable ? "yes" : "no")
+			);
+		printk("lomem_reserve[]:");
+		for (i = 0; i < MAX_NR_ZONES_BS; i++)
+			printk(" %lu", zone->lowmem_reserve[i]);
+		printk("\n");
+	}
+
+	for_each_zone_bs(zone) {
+		unsigned long nr, flags, order, total = 0;
+
+		show_node_bs(zone);
+		printk("%s: ", zone->name);
+		if (!zone->present_pages) {
+			printk("empty\n");
+			continue;
+		}
+
+		spin_lock_irqsave(&zone->lock, flags);
+		for (order = 0; order < MAX_ORDER_BS; order++) {
+			nr = zone->free_area[order].nr_free;
+			total += nr << order;
+			printk("%lu*%lukB ", nr, K_BS(1UL) << order);
+		}
+		spin_unlock_irqrestore(&zone->lock, flags);
+		printk("= %lukB\n", K_BS(total));
+	}
+}
+
 /*
  * Helper functions to size the waitqueue hash table.
  * Essentially these want to choose hash table sizes sufficiently
@@ -1018,6 +1203,22 @@ got_pg:
 }
 EXPORT_SYMBOL_GPL(__alloc_pages_bs);
 
+fastcall_bs unsigned long get_zeroed_page_bs(unsigned int __nocast gfp_mask)
+{
+	struct page_bs *page;
+
+	/*
+	 * get_zeroed_page() returns a 32-bit address, which cannot represent
+	 * a highmem page.
+	 */
+	BUG_ON_BS(gfp_mask & __GFP_HIGHMEM);
+
+	page = alloc_pages_bs(gfp_mask | __GFP_ZERO_BS, 0);
+	if (page)
+		return (unsigned long) page_address_bs(page);
+	return 0;
+}
+
 fastcall_bs void free_pages_bs(unsigned long addr, unsigned int order)
 {
 	if (addr != 0) {
@@ -1379,10 +1580,9 @@ module_initcall_bs(init_per_zone_pages_min_bs);
 
 __initdata int hashdist_bs = HASHDIST_DEFAULT_BS;
 
-#ifndef CONFIG_NUMA
+#ifdef CONFIG_NUMA
 static int __init set_hashdist_bs(char *str)
 {
-	printk("AAAAAAAAAA\n\n\n\n");
 	if (!str)
 		return 0;
 	hashdist_bs = simple_strtoul(str, &str, 0);

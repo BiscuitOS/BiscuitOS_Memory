@@ -29,6 +29,10 @@ DEBUG_DATA_T(buddy);
 DEBUG_DATA_T(slab);
 DEBUG_DATA_T(vmalloc);
 DEBUG_DATA_T(module);
+DEBUG_DATA_T(login);
+
+#define __used		__attribute__((__used__))
+#define __unused	__attribute__((__unused__))
 
 /* FIXME: BiscuitOS initall */
 
@@ -56,6 +60,11 @@ DEBUG_DATA_T(module);
 	static module_entry_t_bs __module_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".module_data_bs"))) = fn
+
+#define login_initcall_bs(fn)						\
+	static login_entry_t_bs __login_entry_##fn			\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".login_data_bs"))) = fn
 
 struct obs_kernel_param_bs {
 	const char *str;

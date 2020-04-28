@@ -80,3 +80,34 @@ static int TestCase_alloc_page_from_highmem(void)
 	return 0;
 }
 buddy_initcall_bs(TestCase_alloc_page_from_highmem);
+
+/*
+ * TestCase: show all free areas
+ */
+static int __unused TestCase_show_all_free_areas(void)
+{
+	show_free_areas_bs();
+	return 0;
+}
+
+/*
+ * TestCase: get an zeroed page.
+ */
+static int __unused TestCase_get_zero_page(void)
+{
+	void *addr;
+
+	/* alloc a zero page */
+	addr = (void *)get_zeroed_page_bs(GFP_KERNEL_BS);
+	if (!addr) {
+		printk("%s: can get zeroed page.\n", __func__);
+		return -ENOMEM;
+	}
+	bs_debug("PAGE_VALUE: %#lx - %#lx\n", 
+				((unsigned long *)addr)[0],
+				((unsigned long *)addr)[8]);
+
+	/* free */
+	free_page_bs((unsigned long)addr);
+	return 0;
+}
