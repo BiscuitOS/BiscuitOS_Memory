@@ -46,6 +46,8 @@
 				 __GFP_NOMEMALLOC_BS)
 
 #define GFP_ATOMIC_BS		(__GFP_HIGH_BS)
+#define GFP_NOIO_BS		(__GFP_WAIT_BS)
+#define GFP_NOFS_BS		(__GFP_WAIT_BS | __GFP_IO_BS)
 #define GFP_KERNEL_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
 #define GFP_USER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
 

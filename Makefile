@@ -53,6 +53,10 @@ $(MODULE_NAME)-m	+= modules/vmalloc/main.o
 # $(MODULE_NAME)-kmap-m	:= modules/kmap/module.o
 $(MODULE_NAME)-m	+= modules/kmap/main.o
 
+## Memory Usage
+#  0) Mempool 
+$(MODULE_NAME)-m	+= modules/mempool/main.o
+
 
 # LD-scripts
 ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
@@ -141,6 +145,10 @@ clean:
 		modules/buddy/.*.cmd modules/bootmem/*.o \
 		modules/bootmem/.*.cmd \
 		modules/slab/.*.cmd modules/slab/*.o \
+		modules/pcp/.*.cmd modules/pcp/*.o \
+		modules/percpu/.*.cmd modules/percpu/*.o \
+		modules/kmap/.*.cmd modules/kmap/*.o \
+		modules/mempool/.*.cmd modules/mempool/*.o \
 		modules/vmalloc/.*.cmd modules/vmalloc/*.o
 
 endif
