@@ -34,6 +34,7 @@ unsigned long phys_initrd_start_bs __initdata = 0;
 unsigned long phys_initrd_size_bs __initdata = 0;
 unsigned long initrd_start_bs, initrd_end_bs;
 extern struct meminfo highmeminfo_bs;
+extern void __init kmap_init_bs(void);
 
 /*
  * empty_zero_page is a special page that is used for
@@ -455,6 +456,9 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc_bs *mdesc)
 	empty_zero_page_bs = virt_to_page_bs(zero_page);
 	/* FIXME: ignore? */
 	flush_dcache_page_bs(empty_zero_page_bs);
+
+	/* FIXME: Kmap from Intel-i386 and high-version ARM */
+	kmap_init_bs();
 }
 
 /* FIXME: BiscuitOS buddy debug stuf */

@@ -88,7 +88,7 @@ typedef u32 pmdval_t_bs;
  * which may not overlap IO space. 
  */
 #ifndef VMALLOC_START_BS
-#define VMALLOC_OFFSET_BS	(8*1024)
+#define VMALLOC_OFFSET_BS	(10*PAGE_SIZE_BS)
 #define VMALLOC_START_BS	(((unsigned long)high_memory_bs +	\
 				VMALLOC_OFFSET_BS) & ~(VMALLOC_OFFSET_BS-1))
 #endif
@@ -405,6 +405,7 @@ extern void cpu_v7_set_pte_ext_bs(pte_t_bs *, pte_t_bs, unsigned int);
 extern struct mm_struct_bs init_mm_bs;
 
 #define pmd_none_bs(pmd)	(!pmd_val_bs(pmd))
+#define pmd_bad_bs(pmd)		(pmd_val_bs(pmd) & 2)
 #define pmd_present_bs(pmd)	(pmd_val_bs(pmd))
 
 /* FIXME: Host function */
@@ -503,6 +504,11 @@ extern pmd_t_bs fastcall_bs *__pmd_alloc_bs(struct mm_struct_bs *mm,
 	ret;								\
 })
 
+static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
+{
+	return pmd_offset_bs(pud_offset_bs(pgd_offset_k_bs(virt), virt), virt);
+}
+
 #define pte_none_bs(pte)		(!pte_val_bs(pte))
 
 /*      
@@ -519,7 +525,9 @@ extern pmd_t_bs fastcall_bs *__pmd_alloc_bs(struct mm_struct_bs *mm,
 					__pte_index_bs(addr))
 #define pfn_pte_bs(pfn,prot)		(__pte_bs(((pfn) << PAGE_SHIFT_BS) | \
 					pgprot_val_bs(prot)))
+#define pte_pfn_bs(pte)			(pte_val_bs(pte) >> PAGE_SHIFT)
 
+#define pte_page_bs(pte)		(pfn_to_page_bs(pte_pfn_bs(pte)))
 #define set_pte_bs(ptep, pte)	cpu_v7_set_pte_ext_bs(ptep, pte, 0)
 #define set_pte_at_bs(mm,addr,ptep,pteval)	set_pte_bs(ptep,pteval)
 #define pte_clear_bs(mm,addr,ptep)					\

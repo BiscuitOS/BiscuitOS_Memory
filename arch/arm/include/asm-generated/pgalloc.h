@@ -61,6 +61,15 @@ static inline void pte_free_kernel_bs(pte_t_bs *pte)
 	}
 }
         
+static inline void __pmd_populate_bs(pmd_t_bs *pmdp, phys_addr_t pte,
+                                  pmdval_t_bs prot)
+{
+	pmdval_t_bs pmdval = (pte + PTE_HWTABLE_OFF) | prot;
+	pmdp[0] = __pmd_bs(pmdval);
+	pmdp[1] = __pmd_bs(pmdval + 256 * sizeof(pte_t_bs));
+	flush_pmd_entry_bs(pmdp);
+}
+
 /*      
  * Populate the pmdp entry with a pointer to the pte.  This pmd is part
  * of the mm address space.

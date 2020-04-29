@@ -52,6 +52,8 @@ $(MODULE_NAME)-m	+= modules/vmalloc/main.o
 # obj-m			+= $(MODULE_NAME)-kmap.o
 # $(MODULE_NAME)-kmap-m	:= modules/kmap/module.o
 $(MODULE_NAME)-m	+= modules/kmap/main.o
+#  8) fixmap
+$(MODULE_NAME)-m	+= modules/fixmap/main.o
 
 ## Memory Usage
 #  0) Mempool 
@@ -148,6 +150,7 @@ clean:
 		modules/pcp/.*.cmd modules/pcp/*.o \
 		modules/percpu/.*.cmd modules/percpu/*.o \
 		modules/kmap/.*.cmd modules/kmap/*.o \
+		modules/fixmap/.*.cmd modules/fixmap/*.o \
 		modules/mempool/.*.cmd modules/mempool/*.o \
 		modules/vmalloc/.*.cmd modules/vmalloc/*.o
 

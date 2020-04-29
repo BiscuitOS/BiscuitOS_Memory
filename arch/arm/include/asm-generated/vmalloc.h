@@ -21,6 +21,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#define VMALLOC_END_BS		(VMALLOC_START_BS+(20 << 20))
+extern u32 BiscuitOS_vmalloc_size;
+#define VMALLOC_END_BS		(VMALLOC_START_BS + \
+				(unsigned long)(BiscuitOS_vmalloc_size))
 
 #endif

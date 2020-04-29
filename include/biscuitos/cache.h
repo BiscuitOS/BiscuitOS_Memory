@@ -24,4 +24,12 @@
 #endif
 #endif
 
+#ifndef __cacheline_aligned_in_smp_bs
+#ifdef CONFIG_SMP
+#define __cacheline_aligned_in_smp_bs	__cacheline_aligned
+#else   
+#define __cacheline_aligned_in_smp_bs
+#endif /* CONFIG_SMP */ 
+#endif
+
 #endif

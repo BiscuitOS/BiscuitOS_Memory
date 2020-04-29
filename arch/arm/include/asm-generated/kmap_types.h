@@ -1,0 +1,29 @@
+#ifndef _BISCUITOS_KMAP_TYPES_H
+#define _BISCUITOS_KMAP_TYPES_H
+
+#ifdef CONFIG_DEBUG_HIGHMEM_BS
+# define D(n)	__KM_FENCE_##n ,
+#else
+# define D(n)
+#endif
+
+enum km_type_bs {
+D(0)	KM_BOUNCE_READ_BS,
+D(1)	KM_SKB_SUNRPC_DATA_BS,
+D(2)	KM_SKB_DATA_SOFTIRQ_BS,
+D(3)	KM_USER0_BS,
+D(4)	KM_USER1_BS,
+D(5)	KM_BIO_SRC_IRQ_BS,
+D(6)	KM_BIO_DST_IRQ_BS,
+D(7)	KM_PTE0_BS,
+D(8)	KM_PTE1_BS,
+D(9)	KM_IRQ0_BS,
+D(10)	KM_IRQ1_BS,
+D(11)	KM_SOFTIRQ0_BS,
+D(12)	KM_SOFTIRQ1_BS,
+D(13)	KM_TYPE_NR_BS
+};
+
+#undef D
+
+#endif

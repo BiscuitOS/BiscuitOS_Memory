@@ -263,6 +263,42 @@ static inline void __flush_tlb_all_bs(void)
 	}
 }
 
+static inline void __local_flush_tlb_kernel_page_bs(unsigned long kaddr)
+{
+	const int zero = 0;
+	const unsigned int __tlb_flag = __cpu_tlb_flags_bs;
+
+	tlb_op_bs(TLB_V4_U_PAGE, "c8, c7, 1", kaddr);
+	tlb_op_bs(TLB_V4_D_PAGE, "c8, c6, 1", kaddr);
+	tlb_op_bs(TLB_V4_I_PAGE, "c8, c5, 1", kaddr);
+	if (!tlb_flag_bs(TLB_V4_I_PAGE) && tlb_flag_bs(TLB_V4_I_FULL))
+		asm("mcr p15, 0, %0, c8, c5, 0" : : "r" (zero) : "cc");
+
+	tlb_op_bs(TLB_V6_U_PAGE, "c8, c7, 1", kaddr);
+	tlb_op_bs(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
+	tlb_op_bs(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
+}
+
+static inline void local_flush_tlb_kernel_page_bs(unsigned long kaddr)
+{
+	const unsigned int __tlb_flag = __cpu_tlb_flags_bs;
+
+	kaddr &= PAGE_MASK_BS;
+
+	if (tlb_flag_bs(TLB_WB))
+		dsb_bs(nshst);
+
+	__local_flush_tlb_kernel_page_bs(kaddr);
+	tlb_op_bs(TLB_V7_UIS_PAGE, "c8, c7, 1", kaddr);
+
+	if (tlb_flag_bs(TLB_BARRIER)) {
+		dsb_bs(nsh);
+		isb_bs();
+	}
+}
+
+#define __flush_tlb_one_bs(vaddr) local_flush_tlb_kernel_page_bs(vaddr)
+
 /*
  * flush_pmd_entry
  *

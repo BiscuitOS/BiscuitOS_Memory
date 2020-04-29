@@ -13,6 +13,7 @@
 #include "biscuitos/mm.h"
 #include "biscuitos/bootmem.h"
 #include "biscuitos/nodemask.h"
+#include "biscuitos/highmem.h"
 #include "asm-generated/map.h"
 #include "asm-generated/system.h"
 #include "asm-generated/map.h"
@@ -24,6 +25,7 @@
 #include "asm-generated/pgalloc.h"
 #include "asm-generated/cputype.h"
 #include "asm-generated/fixmap.h"
+#include "asm-generated/highmem.h"
 
 #define CPOLICY_UNCACHE		0
 #define CPOLICY_BUFFERED	1
@@ -375,16 +377,6 @@ static void __init build_mem_type_table_bs(void)
 	}
 }
 
-static inline pmd_t_bs *pmd_off_bs(pgd_t_bs *pgd, unsigned long virt)
-{
-	return pmd_offset_bs(pgd, virt);
-}
-
-static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
-{
-	return pmd_off_bs(pgd_offset_k_bs(virt), virt);
-}
-
 /*
  * Add a PAGE mapping between VIRT and PHYS in domain
  * DOMIAN with protection PROT. Note that due to the
@@ -695,4 +687,32 @@ void arch_free_page_bs(struct page_bs *page, int order)
 		}
 	}
 #endif
+}
+
+static pte_t_bs *__init early_pte_alloc_bs(pmd_t_bs *pmd, unsigned long addr,
+				unsigned long prot)
+{
+	if (pmd_none_bs(*pmd)) {
+		pte_t_bs *pte = 
+			alloc_bootmem_bs(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+		__pmd_populate_bs(pmd, __pa_bs(pte), prot);
+	}
+	BUG_ON_BS(pmd_bad_bs(*pmd));
+	return pte_offset_kernel_bs(pmd, addr);
+}
+
+pgprot_t_bs kmap_prot_bs;
+pte_t_bs *kmap_pte_bs;
+
+void __init kmap_init_bs(void)
+{
+	/* PKMAP */
+	pkmap_page_table_bs = early_pte_alloc_bs(pmd_off_k_bs(PKMAP_BASE_BS),
+				PKMAP_BASE_BS, _PAGE_KERNEL_TABLE);
+	kmap_prot_bs = PAGE_KERNEL_BS;
+
+	/* FIXMAP */
+	kmap_pte_bs = early_pte_alloc_bs(pmd_off_k_bs(FIXADDR_START_BS),
+				FIXADDR_START_BS, _PAGE_KERNEL_TABLE);
+	
 }

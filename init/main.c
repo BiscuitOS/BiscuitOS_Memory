@@ -196,6 +196,7 @@ static int __init unknown_bootoption_bs(char *param, char *val)
 DEBUG_FUNC_T(vmalloc);
 DEBUG_FUNC_T(module);
 DEBUG_FUNC_T(kmap);
+DEBUG_FUNC_T(fixmap);
 DEBUG_FUNC_T(login);
 
 asmlinkage void __init start_kernel_bs(void)
@@ -225,5 +226,6 @@ asmlinkage void __init start_kernel_bs(void)
 	DEBUG_CALL(module);
 	DEBUG_CALL(vmalloc);
 	DEBUG_CALL(kmap);
+	DEBUG_CALL(fixmap);
 	DEBUG_CALL(login);
 }

@@ -32,6 +32,7 @@ DEBUG_DATA_T(slab);
 DEBUG_DATA_T(vmalloc);
 DEBUG_DATA_T(module);
 DEBUG_DATA_T(kmap);
+DEBUG_DATA_T(fixmap);
 DEBUG_DATA_T(login);
 
 #define __used		__attribute__((__used__))
@@ -78,6 +79,11 @@ DEBUG_DATA_T(login);
 	static kmap_entry_t_bs __kmap_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".kmap_data_bs"))) = fn
+
+#define fixmap_initcall_bs(fn)						\
+	static fixmap_entry_t_bs __fixmap_entry_##fn			\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".fixmap_data_bs"))) = fn
 
 #define login_initcall_bs(fn)						\
 	static login_entry_t_bs __login_entry_##fn			\

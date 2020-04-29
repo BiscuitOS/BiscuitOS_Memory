@@ -56,7 +56,9 @@ u32 BiscuitOS_normal_size;
 u32 BiscuitOS_dma_size;
 u32 BiscuitOS_vmalloc_size;
 u32 BiscuitOS_pkmap_size;
+u32 BiscuitOS_pkmap_last;
 u32 BiscuitOS_fixmap_size;
+u32 BiscuitOS_fixmap_top;
 
 EXPORT_SYMBOL_GPL(BiscuitOS_ram_base);
 
@@ -153,6 +155,8 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		printk("Unable to read BiscuitOS pkmap-size\n");
 		return -EINVAL;
 	}
+	/* last pkmap */
+	BiscuitOS_pkmap_last = BiscuitOS_pkmap_size >> PAGE_SHIFT_BS;
 
 	if ((BiscuitOS_normal_size + BiscuitOS_high_size + 
 				BiscuitOS_dma_size) > BiscuitOS_ram_size) {
@@ -165,6 +169,10 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		printk("Unable to read BiscuitOS fixmap-size\n");
 		return -EINVAL;
 	}
+
+	/* Calculate Fixmap region */
+	BiscuitOS_fixmap_top = BiscuitOS_PAGE_OFFSET + BiscuitOS_ram_size
+					- BiscuitOS_fixmap_size;
 
 	/* Obtain cmdline information */
 	ret = of_property_read_string(np, "cmdline", &string);	
