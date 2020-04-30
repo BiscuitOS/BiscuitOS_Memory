@@ -25,27 +25,27 @@ ENTRY(cpu_v7_set_pte_ext_bs)
 	str     r1, [r0]                        @ linux version
 
 	bic	r3, r1, #0x000003f0
-	bic	r3, r3, #PTE_TYPE_MASK
+	bic	r3, r3, #PTE_TYPE_MASK_BS
 	orr	r3, r3, r2
-	orr	r3, r3, #PTE_EXT_AP0 | 2
+	orr	r3, r3, #PTE_EXT_AP0_BS | 2
 
 	tst	r1, #1 << 4
-	orrne	r3, r3, #PTE_EXT_TEX(1)
+	orrne	r3, r3, #PTE_EXT_TEX_BS(1)
 
-	eor	r1, r1, #L_PTE_DIRTY
-	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
-	orrne	r3, r3, #PTE_EXT_APX
+	eor	r1, r1, #L_PTE_DIRTY_BS
+	tst	r1, #L_PTE_RDONLY_BS | L_PTE_DIRTY_BS
+	orrne	r3, r3, #PTE_EXT_APX_BS
 
-	tst	r1, #L_PTE_USER
-	orrne	r3, r3, #PTE_EXT_AP1
+	tst	r1, #L_PTE_USER_BS
+	orrne	r3, r3, #PTE_EXT_AP1_BS
 
-	tst	r1, #L_PTE_XN
-	orrne	r3, r3, #PTE_EXT_XN
+	tst	r1, #L_PTE_XN_BS
+	orrne	r3, r3, #PTE_EXT_XN_BS
 
-	tst	r1, #L_PTE_YOUNG
-	tstne	r1, #L_PTE_VALID
-	eorne	r1, r1, #L_PTE_NONE
-	tstne	r1, #L_PTE_NONE
+	tst	r1, #L_PTE_YOUNG_BS
+	tstne	r1, #L_PTE_VALID_BS
+	eorne	r1, r1, #L_PTE_NONE_BS
+	tstne	r1, #L_PTE_NONE_BS
 	moveq	r3, #0
 
  ARM(	str	r3, [r0, #2048]!	)

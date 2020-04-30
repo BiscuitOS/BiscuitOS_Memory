@@ -28,7 +28,7 @@
 extern u32 BiscuitOS_vmalloc_size;
 #define PKMAP_BASE_BS		((VMALLOC_OFFSET_BS + VMALLOC_START_BS + \
 				(unsigned long)BiscuitOS_vmalloc_size + \
-				PMD_SIZE - 1) & PMD_MASK)
+				PMD_SIZE_BS - 1) & PMD_MASK_BS)
 #define LAST_PKMAP_MASK_BS	(LAST_PKMAP_BS-1)
 #define PKMAP_NR_BS(virt)	((virt-PKMAP_BASE_BS) >> PAGE_SHIFT_BS)
 #define PKMAP_ADDR_BS(nr)	(PKMAP_BASE_BS + ((nr) << PAGE_SHIFT_BS))

@@ -23,7 +23,7 @@ typedef unsigned long page_flags_t_bs;
 				 MAX_NODES_SHIFT_BS - MAX_ZONES_SHIFT_BS)
 #define NODEZONE_BS(node, zone)	((node << ZONES_SHIFT_BS) | zone)
 
-struct address_space_bs;
+struct address_space;
 
 /*
  * Each physical page in the system has a struct page associated with
@@ -46,7 +46,7 @@ struct page_bs {
 					 * When page is free, this indicates
 					 * order in the buddy system.
 					 */
-	struct address_space_bs *mapping; /* If low bit clear, points to
+	struct address_space *mapping; /* If low bit clear, points to
 					 * inode address_space, or NULL.
 					 * If page mapped as anonymous
 					 * memory, low bit is set, and
@@ -88,6 +88,15 @@ struct page_bs {
 	BUG_ON_BS(page_count_bs(p) == 0);				\
 	atomic_add_negative(-1, &(p)->_count);				\
 })
+
+/*
+ * Grab a ref, return true if the page previously had a logical refcount of
+ * zero.  ie: returns true if we just grabbed an already-deemed-to-be-free page
+ */
+#define get_page_testone_bs(p)	atomic_inc_and_test(&(p)->_count)
+
+#define set_page_count_bs(p,v)	atomic_set(&(p)->_count, v - 1)
+#define __put_page_bs(p)	atomic_dec(&(p)->_count)
 
 static inline int page_count_bs(struct page_bs *p)
 {
@@ -140,6 +149,14 @@ static inline int PageAnon_bs(struct page_bs *page)
 	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON_BS) != 0;
 }
 
+/*
+ * Return true if this page is mapped into pagetables.
+ */
+static inline int page_mapped_bs(struct page_bs *page)
+{
+	return atomic_read(&(page)->_mapcount) >= 0;
+}
+
 struct pglist_data_bs;
 extern void *high_memory_bs;
 extern unsigned long num_physpages_bs;
@@ -182,5 +199,8 @@ extern unsigned long num_physpages_bs;
 extern pte_t_bs *FASTCALL_BS(pte_alloc_kernel_bs(struct mm_struct_bs *mm,
 				pmd_t_bs *pmd, unsigned long address));
 extern void show_free_areas_bs(void);
+struct sysinfo_bs;
+extern void si_meminfo_bs(struct sysinfo_bs *);
+extern int __set_page_dirty_nobuffers_bs(struct page *page);
 
 #endif

@@ -29,35 +29,38 @@ $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)
 
 ## Memory Allocator Test Code
 #  0) bootmem
-$(MODULE_NAME)-m	+= modules/bootmem/main.o
+$(MODULE_NAME)-m		+= modules/bootmem/main.o
 #  2) PERCPU
-$(MODULE_NAME)-m	+= modules/percpu/main.o
+$(MODULE_NAME)-m		+= modules/percpu/main.o
 #  3) Buddy
-# obj-m			+= $(MODULE_NAME)-buddy.o
-# $(MODULE_NAME)-buddy-m	:= modules/buddy/module.o
-$(MODULE_NAME)-m	+= modules/buddy/main.o
+# obj-m				+= $(MODULE_NAME)-buddy.o
+# $(MODULE_NAME)-buddy-m		:= modules/buddy/module.o
+$(MODULE_NAME)-m		+= modules/buddy/main.o
 #  4) PCP: hot-cold
-# obj-m			+= $(MODULE_NAME)-pcp.o
-# $(MODULE_NAME)-pcp-m	:= modules/pcp/module.o
-$(MODULE_NAME)-m	+= modules/pcp/main.o
+# obj-m				+= $(MODULE_NAME)-pcp.o
+# $(MODULE_NAME)-pcp-m		:= modules/pcp/module.o
+$(MODULE_NAME)-m		+= modules/pcp/main.o
 #  5) Slab
-# obj-m			+= $(MODULE_NAME)-slab.o
-# $(MODULE_NAME)-slab-m	:= modules/slab/module.o
-$(MODULE_NAME)-m	+= modules/slab/main.o
+# obj-m				+= $(MODULE_NAME)-slab.o
+# $(MODULE_NAME)-slab-m		:= modules/slab/module.o
+$(MODULE_NAME)-m		+= modules/slab/main.o
 #  6) VMALLOC
-# obj-m			+= $(MODULE_NAME)-vmalloc.o
+# obj-m				+= $(MODULE_NAME)-vmalloc.o
 # $(MODULE_NAME)-vmalloc-m	:= modules/vmalloc/module.o
-$(MODULE_NAME)-m	+= modules/vmalloc/main.o
+$(MODULE_NAME)-m		+= modules/vmalloc/main.o
 #  7) kmap
-# obj-m			+= $(MODULE_NAME)-kmap.o
-# $(MODULE_NAME)-kmap-m	:= modules/kmap/module.o
-$(MODULE_NAME)-m	+= modules/kmap/main.o
+# obj-m				+= $(MODULE_NAME)-kmap.o
+# $(MODULE_NAME)-kmap-m		:= modules/kmap/module.o
+$(MODULE_NAME)-m		+= modules/kmap/main.o
 #  8) fixmap
-$(MODULE_NAME)-m	+= modules/fixmap/main.o
+$(MODULE_NAME)-m		+= modules/fixmap/main.o
 
 ## Memory Usage
 #  0) Mempool 
-$(MODULE_NAME)-m	+= modules/mempool/main.o
+$(MODULE_NAME)-m		+= modules/mempool/main.o
+#  1) swap 
+# obj-m				+= $(MODULE_NAME)-swap.o
+# $(MODULE_NAME)-swap-m		:= modules/swap/module.o
 
 
 # LD-scripts
@@ -69,6 +72,11 @@ ccflags-y		+= -DCONFIG_NR_CPUS_BS=8
 ccflags-y		+= -DCONFIG_HIGHMEM_BS
 # Support SLAB Debug
 # ccflags-y		+= -DCONFIG_DEBUG_SLAB_BS
+# Support TMPFS
+ccflags-y		+= -DCONFIG_TMPFS_BS
+ccflags-y		+= -DCONFIG_TMPFS_XATTR_BS
+# Support 5.0
+ccflags-y		+= -DCONFIG_BISCUITOS_5
 ## ASFlags
 asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
 asflags-y		+= -I$(PWD)/include
@@ -150,6 +158,7 @@ clean:
 		modules/pcp/.*.cmd modules/pcp/*.o \
 		modules/percpu/.*.cmd modules/percpu/*.o \
 		modules/kmap/.*.cmd modules/kmap/*.o \
+		modules/swap/.*.cmd modules/swap/*.o \
 		modules/fixmap/.*.cmd modules/fixmap/*.o \
 		modules/mempool/.*.cmd modules/mempool/*.o \
 		modules/vmalloc/.*.cmd modules/vmalloc/*.o

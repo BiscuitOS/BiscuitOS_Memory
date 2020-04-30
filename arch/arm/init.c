@@ -274,7 +274,7 @@ static __init void reserve_node_zero_bs(unsigned int bootmap_pfn,
 	 * and can only be in node 0.
 	 */
 	reserve_bootmem_node_bs(pgdat, __pa_bs(swapper_pg_dir_bs),
-			PTRS_PER_PGD * sizeof(pgd_t_bs));
+			PTRS_PER_PGD_BS * sizeof(pgd_t_bs));
 
 	/*
 	 * And don't forget to reserve the allocator bitmap,

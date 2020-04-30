@@ -151,37 +151,37 @@ typedef u32 pmdval_t_bs;
  * until either the TLB entry is evicted under pressure, or a context
  * switch which changes the user space mapping occurs.
  */
-#define PTRS_PER_PTE		512
-#define PTRS_PER_PMD		1
-#define PTRS_PER_PGD		2048
+#define PTRS_PER_PTE_BS		512
+#define PTRS_PER_PMD_BS		1
+#define PTRS_PER_PGD_BS		2048
 
-#define PTE_HWTABLE_PTRS	(PTRS_PER_PTE)
-#define PTE_HWTABLE_OFF		(PTE_HWTABLE_PTRS * sizeof(pte_t))
-#define PTE_HWTABLE_SIZE	(PTRS_PER_PTE * sizeof(u32))
+#define PTE_HWTABLE_PTRS_BS	(PTRS_PER_PTE_BS)
+#define PTE_HWTABLE_OFF_BS	(PTE_HWTABLE_PTRS_BS * sizeof(pte_t))
+#define PTE_HWTABLE_SIZE_BS	(PTRS_PER_PTE_BS * sizeof(u32))
 
 /*
  * PMD_SHIFT determines the size of the area a second-level page table can map
  * PGDIR_SHIFT determines what a third-level page table entry can map
  */
-#define PMD_SHIFT		21
-#define PGDIR_SHIFT		21
+#define PMD_SHIFT_BS		21
+#define PGDIR_SHIFT_BS		21
 
-#define PMD_SIZE		(1UL << PMD_SHIFT)
-#define PMD_MASK		(~(PMD_SIZE-1))
-#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
+#define PMD_SIZE_BS		(1UL << PMD_SHIFT_BS)
+#define PMD_MASK_BS		(~(PMD_SIZE_BS-1))
+#define PGDIR_SIZE_BS		(1UL << PGDIR_SHIFT_BS)
+#define PGDIR_MASK_BS		(~(PGDIR_SIZE_BS-1))
 
-#define PUD_SHIFT		PGDIR_SHIFT
-#define PTRS_PER_PUD		1
-#define PUD_SIZE		(1UL << PUD_SHIFT)
-#define PUD_MASK		(~(PUD_SIZE-1))
+#define PUD_SHIFT_BS		PGDIR_SHIFT_BS
+#define PTRS_PER_PUD_BS		1
+#define PUD_SIZE_BS		(1UL << PUD_SHIFT_BS)
+#define PUD_MASK_BS		(~(PUD_SIZE_BS-1))
 
 /*
  * section address mask and size definitions.
  */
-#define SECTION_SHIFT		20
-#define SECTION_SIZE		(1UL << SECTION_SHIFT)
-#define SECTION_MASK		(~(SECTION_SIZE-1))
+#define SECTION_SHIFT_BS	20
+#define SECTION_SIZE_BS		(1UL << SECTION_SHIFT_BS)
+#define SECTION_MASK_BS		(~(SECTION_SIZE_BS-1))
 
 /*
  * "Linux" PTE definitions.
@@ -194,15 +194,15 @@ typedef u32 pmdval_t_bs;
  * The PTE table pointer refers to the hardware entries; the "Linux"
  * entries are stored 1024 bytes below.
  */
-#define L_PTE_VALID		(_AT(pteval_t_bs, 1) << 0)         /* Valid */
-#define L_PTE_PRESENT		(_AT(pteval_t_bs, 1) << 0)
-#define L_PTE_YOUNG		(_AT(pteval_t_bs, 1) << 1)
-#define L_PTE_DIRTY		(_AT(pteval_t_bs, 1) << 6)
-#define L_PTE_RDONLY		(_AT(pteval_t_bs, 1) << 7)
-#define L_PTE_USER		(_AT(pteval_t_bs, 1) << 8)
-#define L_PTE_XN		(_AT(pteval_t_bs, 1) << 9)
-#define L_PTE_SHARED		(_AT(pteval_t_bs, 1) << 10)        /* shared(v6), coherent(xsc3) */
-#define L_PTE_NONE		(_AT(pteval_t_bs, 1) << 11)
+#define L_PTE_VALID_BS		(_AT(pteval_t_bs, 1) << 0)         /* Valid */
+#define L_PTE_PRESENT_BS	(_AT(pteval_t_bs, 1) << 0)
+#define L_PTE_YOUNG_BS		(_AT(pteval_t_bs, 1) << 1)
+#define L_PTE_DIRTY_BS		(_AT(pteval_t_bs, 1) << 6)
+#define L_PTE_RDONLY_BS		(_AT(pteval_t_bs, 1) << 7)
+#define L_PTE_USER_BS		(_AT(pteval_t_bs, 1) << 8)
+#define L_PTE_XN_BS		(_AT(pteval_t_bs, 1) << 9)
+#define L_PTE_SHARED_BS		(_AT(pteval_t_bs, 1) << 10)        /* shared(v6), coherent(xsc3) */
+#define L_PTE_NONE_BS		(_AT(pteval_t_bs, 1) << 11)
 
 /*
  * These are the memory types, defined to be compatible with
@@ -237,18 +237,18 @@ typedef u32 pmdval_t_bs;
  * - number, order and size of accesses are maintained
  * - unaligned accesses are "unpredictable"
  */
-#define L_PTE_MT_UNCACHED	(_AT(pteval_t_bs, 0x00) << 2)      /* 0000 */
-#define L_PTE_MT_BUFFERABLE	(_AT(pteval_t_bs, 0x01) << 2)      /* 0001 */
-#define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t_bs, 0x02) << 2)      /* 0010 */
-#define L_PTE_MT_WRITEBACK	(_AT(pteval_t_bs, 0x03) << 2)      /* 0011 */
-#define L_PTE_MT_MINICACHE	(_AT(pteval_t_bs, 0x06) << 2)      /* 0110 (sa1100, xscale) */
-#define L_PTE_MT_WRITEALLOC	(_AT(pteval_t_bs, 0x07) << 2)      /* 0111 */
-#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t_bs, 0x04) << 2)      /* 0100 */
-#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t_bs, 0x0c) << 2)      /* 1100 */
-#define L_PTE_MT_DEV_WC		(_AT(pteval_t_bs, 0x09) << 2)      /* 1001 */
-#define L_PTE_MT_DEV_CACHED	(_AT(pteval_t_bs, 0x0b) << 2)      /* 1011 */
-#define L_PTE_MT_VECTORS	(_AT(pteval_t_bs, 0x0f) << 2)      /* 1111 */
-#define L_PTE_MT_MASK		(_AT(pteval_t_bs, 0x0f) << 2)
+#define L_PTE_MT_UNCACHED_BS	(_AT(pteval_t_bs, 0x00) << 2)      /* 0000 */
+#define L_PTE_MT_BUFFERABLE_BS	(_AT(pteval_t_bs, 0x01) << 2)      /* 0001 */
+#define L_PTE_MT_WRITETHROUGH_BS (_AT(pteval_t_bs, 0x02) << 2)      /* 0010 */
+#define L_PTE_MT_WRITEBACK_BS	(_AT(pteval_t_bs, 0x03) << 2)      /* 0011 */
+#define L_PTE_MT_MINICACHE_BS	(_AT(pteval_t_bs, 0x06) << 2)      /* 0110 (sa1100, xscale) */
+#define L_PTE_MT_WRITEALLOC_BS	(_AT(pteval_t_bs, 0x07) << 2)      /* 0111 */
+#define L_PTE_MT_DEV_SHARED_BS	(_AT(pteval_t_bs, 0x04) << 2)      /* 0100 */
+#define L_PTE_MT_DEV_NONSHARED_BS (_AT(pteval_t_bs, 0x0c) << 2)      /* 1100 */
+#define L_PTE_MT_DEV_WC_BS	(_AT(pteval_t_bs, 0x09) << 2)      /* 1001 */
+#define L_PTE_MT_DEV_CACHED_BS	(_AT(pteval_t_bs, 0x0b) << 2)      /* 1011 */
+#define L_PTE_MT_VECTORS_BS	(_AT(pteval_t_bs, 0x0f) << 2)      /* 1111 */
+#define L_PTE_MT_MASK_BS	(_AT(pteval_t_bs, 0x0f) << 2)
 
 /*
  * The pgprot_* and protection_map entries will be fixed up in runtime
@@ -256,14 +256,14 @@ typedef u32 pmdval_t_bs;
  * as well as any architecture dependent bits like global/ASID and SMP
  * shared mapping bits.
  */
-#define _L_PTE_DEFAULT		L_PTE_PRESENT | L_PTE_YOUNG
+#define _L_PTE_DEFAULT_BS	L_PTE_PRESENT_BS | L_PTE_YOUNG_BS
 
 /*
  * ARMv6 supersection address mask and size definitions.
  */
-#define SUPERSECTION_SHIFT	24
-#define SUPERSECTION_SIZE	(1UL << SUPERSECTION_SHIFT)
-#define SUPERSECTION_MASK	(~(SUPERSECTION_SIZE-1))
+#define SUPERSECTION_SHIFT_BS	24
+#define SUPERSECTION_SIZE_BS	(1UL << SUPERSECTION_SHIFT_BS)
+#define SUPERSECTION_MASK_BS	(~(SUPERSECTION_SIZE_BS-1))
 
 /*
  * Hardware page table definitions.
@@ -271,41 +271,41 @@ typedef u32 pmdval_t_bs;
  * + Level 1 descriptor (PMD)
  *   - common
  */
-#define PMD_TYPE_MASK		(_AT(pmdval_t_bs, 3) << 0)
-#define PMD_TYPE_FAULT		(_AT(pmdval_t_bs, 0) << 0)
-#define PMD_TYPE_TABLE		(_AT(pmdval_t_bs, 1) << 0)
-#define PMD_TYPE_SECT		(_AT(pmdval_t_bs, 2) << 0)
-#define PMD_PXNTABLE		(_AT(pmdval_t_bs, 1) << 2)     /* v7 */
-#define PMD_BIT4		(_AT(pmdval_t_bs, 1) << 4)
-#define PMD_DOMAIN(x)		(_AT(pmdval_t_bs, (x)) << 5)
-#define PMD_DOMAIN_MASK		PMD_DOMAIN(0x0f)
-#define PMD_PROTECTION		(_AT(pmdval_t_bs, 1) << 9)         /* v5 */
+#define PMD_TYPE_MASK_BS		(_AT(pmdval_t_bs, 3) << 0)
+#define PMD_TYPE_FAULT_BS		(_AT(pmdval_t_bs, 0) << 0)
+#define PMD_TYPE_TABLE_BS		(_AT(pmdval_t_bs, 1) << 0)
+#define PMD_TYPE_SECT_BS		(_AT(pmdval_t_bs, 2) << 0)
+#define PMD_PXNTABLE_BS			(_AT(pmdval_t_bs, 1) << 2)     /* v7 */
+#define PMD_BIT4_BS			(_AT(pmdval_t_bs, 1) << 4)
+#define PMD_DOMAIN_BS(x)		(_AT(pmdval_t_bs, (x)) << 5)
+#define PMD_DOMAIN_MASK_BS		PMD_DOMAIN_BS(0x0f)
+#define PMD_PROTECTION_BS		(_AT(pmdval_t_bs, 1) << 9)     /* v5 */
 /*
  *   - section
  */
-#define PMD_SECT_PXN		(_AT(pmdval_t_bs, 1) << 0)     /* v7 */
-#define PMD_SECT_BUFFERABLE	(_AT(pmdval_t_bs, 1) << 2)
-#define PMD_SECT_CACHEABLE	(_AT(pmdval_t_bs, 1) << 3)
-#define PMD_SECT_XN		(_AT(pmdval_t_bs, 1) << 4)         /* v6 */
-#define PMD_SECT_AP_WRITE	(_AT(pmdval_t_bs, 1) << 10)
-#define PMD_SECT_AP_READ	(_AT(pmdval_t_bs, 1) << 11)
-#define PMD_SECT_TEX(x)		(_AT(pmdval_t_bs, (x)) << 12)      /* v5 */
-#define PMD_SECT_APX		(_AT(pmdval_t_bs, 1) << 15)        /* v6 */
-#define PMD_SECT_S		(_AT(pmdval_t_bs, 1) << 16)        /* v6 */
-#define PMD_SECT_nG		(_AT(pmdval_t_bs, 1) << 17)        /* v6 */
-#define PMD_SECT_SUPER		(_AT(pmdval_t_bs, 1) << 18)        /* v6 */
-#define PMD_SECT_AF		(_AT(pmdval_t_bs, 0))
+#define PMD_SECT_PXN_BS		(_AT(pmdval_t_bs, 1) << 0)     /* v7 */
+#define PMD_SECT_BUFFERABLE_BS	(_AT(pmdval_t_bs, 1) << 2)
+#define PMD_SECT_CACHEABLE_BS	(_AT(pmdval_t_bs, 1) << 3)
+#define PMD_SECT_XN_BS		(_AT(pmdval_t_bs, 1) << 4)         /* v6 */
+#define PMD_SECT_AP_WRITE_BS	(_AT(pmdval_t_bs, 1) << 10)
+#define PMD_SECT_AP_READ_BS	(_AT(pmdval_t_bs, 1) << 11)
+#define PMD_SECT_TEX_BS(x)	(_AT(pmdval_t_bs, (x)) << 12)      /* v5 */
+#define PMD_SECT_APX_BS		(_AT(pmdval_t_bs, 1) << 15)        /* v6 */
+#define PMD_SECT_S_BS		(_AT(pmdval_t_bs, 1) << 16)        /* v6 */
+#define PMD_SECT_nG_BS		(_AT(pmdval_t_bs, 1) << 17)        /* v6 */
+#define PMD_SECT_SUPER_BS	(_AT(pmdval_t_bs, 1) << 18)        /* v6 */
+#define PMD_SECT_AF_BS		(_AT(pmdval_t_bs, 0))
 
-#define PMD_SECT_UNCACHED	(_AT(pmdval_t_bs, 0))
-#define PMD_SECT_BUFFERED	(PMD_SECT_BUFFERABLE)
-#define PMD_SECT_WT		(PMD_SECT_CACHEABLE)
-#define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
-#define PMD_SECT_MINICACHE	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE)
-#define PMD_SECT_WBWA		(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | \
-				PMD_SECT_BUFFERABLE)
-#define PMD_SECT_CACHE_MASK	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | \
-				PMD_SECT_BUFFERABLE)
-#define PMD_SECT_NONSHARED_DEV	(PMD_SECT_TEX(2))
+#define PMD_SECT_UNCACHED_BS	(_AT(pmdval_t_bs, 0))
+#define PMD_SECT_BUFFERED_BS	(PMD_SECT_BUFFERABLE_BS)
+#define PMD_SECT_WT_BS		(PMD_SECT_CACHEABLE_BS)
+#define PMD_SECT_WB_BS		(PMD_SECT_CACHEABLE_BS | PMD_SECT_BUFFERABLE_BS)
+#define PMD_SECT_MINICACHE_BS	(PMD_SECT_TEX_BS(1) | PMD_SECT_CACHEABLE_BS)
+#define PMD_SECT_WBWA_BS	(PMD_SECT_TEX_BS(1) | PMD_SECT_CACHEABLE_BS | \
+				PMD_SECT_BUFFERABLE_BS)
+#define PMD_SECT_CACHE_MASK_BS	(PMD_SECT_TEX_BS(1) | PMD_SECT_CACHEABLE_BS | \
+				PMD_SECT_BUFFERABLE_BS)
+#define PMD_SECT_NONSHARED_DEV_BS (PMD_SECT_TEX_BS(2))
 
 /*
  *   - coarse table (not used)
@@ -315,41 +315,41 @@ typedef u32 pmdval_t_bs;
  * + Level 2 descriptor (PTE)
  *   - common
  */
-#define PTE_TYPE_MASK		(_AT(pteval_t_bs, 3) << 0)
-#define PTE_TYPE_FAULT		(_AT(pteval_t_bs, 0) << 0)
-#define PTE_TYPE_LARGE		(_AT(pteval_t_bs, 1) << 0)
-#define PTE_TYPE_SMALL		(_AT(pteval_t_bs, 2) << 0)
-#define PTE_TYPE_EXT		(_AT(pteval_t_bs, 3) << 0)         /* v5 */
-#define PTE_BUFFERABLE		(_AT(pteval_t_bs, 1) << 2)
-#define PTE_CACHEABLE		(_AT(pteval_t_bs, 1) << 3)
+#define PTE_TYPE_MASK_BS		(_AT(pteval_t_bs, 3) << 0)
+#define PTE_TYPE_FAULT_BS		(_AT(pteval_t_bs, 0) << 0)
+#define PTE_TYPE_LARGE_BS		(_AT(pteval_t_bs, 1) << 0)
+#define PTE_TYPE_SMALL_BS		(_AT(pteval_t_bs, 2) << 0)
+#define PTE_TYPE_EXT_BS			(_AT(pteval_t_bs, 3) << 0)     /* v5 */
+#define PTE_BUFFERABLE_BS		(_AT(pteval_t_bs, 1) << 2)
+#define PTE_CACHEABLE_BS		(_AT(pteval_t_bs, 1) << 3)
 
 /*
  *   - extended small page/tiny page
  */
-#define PTE_EXT_XN		(_AT(pteval_t_bs, 1) << 0)         /* v6 */
-#define PTE_EXT_AP_MASK		(_AT(pteval_t_bs, 3) << 4)
-#define PTE_EXT_AP0		(_AT(pteval_t_bs, 1) << 4)
-#define PTE_EXT_AP1		(_AT(pteval_t_bs, 2) << 4)
-#define PTE_EXT_AP_UNO_SRO	(_AT(pteval_t_bs, 0) << 4)
-#define PTE_EXT_AP_UNO_SRW	(PTE_EXT_AP0)
-#define PTE_EXT_AP_URO_SRW	(PTE_EXT_AP1)
-#define PTE_EXT_AP_URW_SRW	(PTE_EXT_AP1|PTE_EXT_AP0)
-#define PTE_EXT_TEX(x)		(_AT(pteval_t_bs, (x)) << 6)       /* v5 */
-#define PTE_EXT_APX		(_AT(pteval_t_bs, 1) << 9)         /* v6 */
-#define PTE_EXT_COHERENT	(_AT(pteval_t_bs, 1) << 9)         /* XScale3 */
-#define PTE_EXT_SHARED		(_AT(pteval_t_bs, 1) << 10)        /* v6 */
-#define PTE_EXT_NG		(_AT(pteval_t_bs, 1) << 11)        /* v6 */
+#define PTE_EXT_XN_BS		(_AT(pteval_t_bs, 1) << 0)         /* v6 */
+#define PTE_EXT_AP_MASK_BS	(_AT(pteval_t_bs, 3) << 4)
+#define PTE_EXT_AP0_BS		(_AT(pteval_t_bs, 1) << 4)
+#define PTE_EXT_AP1_BS		(_AT(pteval_t_bs, 2) << 4)
+#define PTE_EXT_AP_UNO_SRO_BS	(_AT(pteval_t_bs, 0) << 4)
+#define PTE_EXT_AP_UNO_SRW_BS	(PTE_EXT_AP0_BS)
+#define PTE_EXT_AP_URO_SRW_BS	(PTE_EXT_AP1_BS)
+#define PTE_EXT_AP_URW_SRW_BS	(PTE_EXT_AP1_BS|PTE_EXT_AP0_BS)
+#define PTE_EXT_TEX_BS(x)	(_AT(pteval_t_bs, (x)) << 6)       /* v5 */
+#define PTE_EXT_APX_BS		(_AT(pteval_t_bs, 1) << 9)         /* v6 */
+#define PTE_EXT_COHERENT_BS	(_AT(pteval_t_bs, 1) << 9)         /* XScale3 */
+#define PTE_EXT_SHARED_BS	(_AT(pteval_t_bs, 1) << 10)        /* v6 */
+#define PTE_EXT_NG_BS		(_AT(pteval_t_bs, 1) << 11)        /* v6 */
 
 /*
  *   - small page
  */
-#define PTE_SMALL_AP_MASK	(_AT(pteval_t_bs, 0xff) << 4)
-#define PTE_SMALL_AP_UNO_SRO	(_AT(pteval_t_bs, 0x00) << 4)
-#define PTE_SMALL_AP_UNO_SRW	(_AT(pteval_t_bs, 0x55) << 4)
-#define PTE_SMALL_AP_URO_SRW	(_AT(pteval_t_bs, 0xaa) << 4)
-#define PTE_SMALL_AP_URW_SRW	(_AT(pteval_t_bs, 0xff) << 4)
+#define PTE_SMALL_AP_MASK_BS	(_AT(pteval_t_bs, 0xff) << 4)
+#define PTE_SMALL_AP_UNO_SRO_BS	(_AT(pteval_t_bs, 0x00) << 4)
+#define PTE_SMALL_AP_UNO_SRW_BS	(_AT(pteval_t_bs, 0x55) << 4)
+#define PTE_SMALL_AP_URO_SRW_BS	(_AT(pteval_t_bs, 0xaa) << 4)
+#define PTE_SMALL_AP_URW_SRW_BS	(_AT(pteval_t_bs, 0xff) << 4)
 
-#define PHYS_MASK		(~0UL)
+#define PHYS_MASK_BS		(~0UL)
 
 #ifndef __ASSEMBLY__
 extern pgprot_t_bs		pgprot_kernel_bs;
@@ -357,20 +357,23 @@ extern pgprot_t_bs		pgprot_kernel_bs;
 
 #define _MOD_PROT_BS(p, b)	__pgprot_bs(pgprot_val_bs(p) | (b))
 
-#define PAGE_KERNEL_BS		_MOD_PROT_BS(pgprot_kernel_bs, L_PTE_XN)
-#define __PAGE_NONE		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_RDONLY | \
-						L_PTE_XN | L_PTE_NONE) 
-#define __PAGE_SHARED		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
-						L_PTE_XN)
-#define __PAGE_SHARED_EXEC	__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER)
-#define __PAGE_COPY		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
-						L_PTE_RDONLY | L_PTE_XN)
-#define __PAGE_COPY_EXEC	__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
-						L_PTE_RDONLY)
-#define __PAGE_READONLY		__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
-						L_PTE_RDONLY | L_PTE_XN)
-#define __PAGE_READONLY_EXEC	__pgprot_bs(_L_PTE_DEFAULT | L_PTE_USER | \
-						L_PTE_RDONLY)
+#define PAGE_KERNEL_BS		_MOD_PROT_BS(pgprot_kernel_bs, L_PTE_XN_BS)
+#define __PAGE_NONE_BS		__pgprot_bs(_L_PTE_DEFAULT_BS | \
+				L_PTE_RDONLY_BS | \
+				L_PTE_XN_BS | L_PTE_NONE_BS) 
+#define __PAGE_SHARED_BS	__pgprot_bs(_L_PTE_DEFAULT_BS | \
+				L_PTE_USER_BS | L_PTE_XN_BS)
+#define __PAGE_SHARED_EXEC_BS	__pgprot_bs(_L_PTE_DEFAULT_BS | L_PTE_USER_BS)
+#define __PAGE_COPY_BS		__pgprot_bs(_L_PTE_DEFAULT_BS | \
+				L_PTE_USER_BS | \
+				L_PTE_RDONLY_BS | L_PTE_XN_BS)
+#define __PAGE_COPY_EXEC_BS	__pgprot_bs(_L_PTE_DEFAULT_BS | \
+				L_PTE_USER_BS | L_PTE_RDONLY_BS)
+#define __PAGE_READONLY_BS	__pgprot_bs(_L_PTE_DEFAULT_BS | \
+				L_PTE_USER_BS | \
+				L_PTE_RDONLY_BS | L_PTE_XN_BS)
+#define __PAGE_READONLY_EXEC_BS	__pgprot_bs(_L_PTE_DEFAULT_BS | \
+				L_PTE_USER_BS | L_PTE_RDONLY_BS)
 
 /*
  * The table below defines the page protection levels that we insert into our
@@ -380,23 +383,23 @@ extern pgprot_t_bs		pgprot_kernel_bs;
  *  2) If we could do execute protection, then read is implied
  *  3) write implies read permissions 
  */
-#define __P000	__PAGE_NONE
-#define __P001	__PAGE_READONLY
-#define __P010	__PAGE_COPY
-#define __P011	__PAGE_COPY
-#define __P100	__PAGE_READONLY_EXEC
-#define __P101	__PAGE_READONLY_EXEC
-#define __P110	__PAGE_COPY_EXEC
-#define __P111	__PAGE_COPY_EXEC
+#define __P000_BS	__PAGE_NONE_BS
+#define __P001_BS	__PAGE_READONLY_BS
+#define __P010_BS	__PAGE_COPY_BS
+#define __P011_BS	__PAGE_COPY_BS
+#define __P100_BS	__PAGE_READONLY_EXEC_BS
+#define __P101_BS	__PAGE_READONLY_EXEC_BS
+#define __P110_BS	__PAGE_COPY_EXEC_BS
+#define __P111_BS	__PAGE_COPY_EXEC_BS
 
-#define __S000	__PAGE_NONE
-#define __S001	__PAGE_READONLY
-#define __S010	__PAGE_SHARED
-#define __S011	__PAGE_SHARED
-#define __S100	__PAGE_READONLY_EXEC
-#define __S101	__PAGE_READONLY_EXEC
-#define __S110	__PAGE_SHARED_EXEC
-#define __S111	__PAGE_SHARED_EXEC
+#define __S000_BS	__PAGE_NONE_BS
+#define __S001_BS	__PAGE_READONLY_BS
+#define __S010_BS	__PAGE_SHARED_BS
+#define __S011_BS	__PAGE_SHARED_BS
+#define __S100_BS	__PAGE_READONLY_EXEC_BS
+#define __S101_BS	__PAGE_READONLY_EXEC_BS
+#define __S110_BS	__PAGE_SHARED_EXEC_BS
+#define __S111_BS	__PAGE_SHARED_EXEC_BS
 
 #ifndef __ASSEMBLY__
 extern phys_addr_t swapper_pg_dir_bs;
@@ -422,8 +425,8 @@ static inline pte_t_bs *pmd_page_kernel_bs(pmd_t_bs pmd)
 {
 	unsigned long ptr;
 
-	ptr = pmd_val_bs(pmd) & ~(PTRS_PER_PTE * sizeof(void *) - 1);
-	ptr += PTRS_PER_PTE * sizeof(void *);
+	ptr = pmd_val_bs(pmd) & ~(PTRS_PER_PTE_BS * sizeof(void *) - 1);
+	ptr += PTRS_PER_PTE_BS * sizeof(void *);
 
 	return __va_bs(ptr);
 }
@@ -457,7 +460,7 @@ static inline int pgd_none_or_clear_bad_bs(pgd_t_bs *pgd)
 #define pmd_addr_end_bs(addr,end)	(end)
 
 /* to find an entry in a page-table-directory */
-#define pgd_index_bs(addr)		((addr) >> PGDIR_SHIFT)
+#define pgd_index_bs(addr)		((addr) >> PGDIR_SHIFT_BS)
 
 #define pgd_offset_bs(mm, addr)		((mm)->pgd+pgd_index_bs(addr))
 
@@ -470,6 +473,7 @@ static inline pud_t_bs *pud_offset_bs(pgd_t_bs *pgd, unsigned long address)
 }
 
 #define pud_none_bs(pud)			0
+#define pud_present_bs(pud)			1
 #define pud_bad_bs(pud)				0
 #define pud_ERROR_bs(pud)			do { } while (0)
 #define pud_clear_bs(pud)			pgd_clear_bs(pud)
@@ -519,7 +523,7 @@ static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_index_bs(addr)		(((addr) >> PAGE_SHIFT_BS) & \
-						(PTRS_PER_PTE - 1))
+						(PTRS_PER_PTE_BS - 1))
 
 #define pte_offset_kernel_bs(dir,addr)	(pmd_page_kernel_bs(*(dir)) + \
 					__pte_index_bs(addr))
@@ -527,6 +531,9 @@ static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
 					pgprot_val_bs(prot)))
 #define pte_pfn_bs(pte)			(pte_val_bs(pte) >> PAGE_SHIFT)
 
+#define pte_offset_map_bs(dir,addr)	(pmd_page_kernel_bs(*(dir)) + \
+						__pte_index_bs(addr))
+#define pte_unmap_bs(pte)		do { } while (0)
 #define pte_page_bs(pte)		(pfn_to_page_bs(pte_pfn_bs(pte)))
 #define set_pte_bs(ptep, pte)	cpu_v7_set_pte_ext_bs(ptep, pte, 0)
 #define set_pte_at_bs(mm,addr,ptep,pteval)	set_pte_bs(ptep,pteval)
@@ -536,7 +543,12 @@ static inline pmd_t_bs *pmd_off_k_bs(unsigned long virt)
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-#define pte_present_bs(pte)	(pte_val_bs(pte) & L_PTE_PRESENT)
+#define pte_present_bs(pte)	(pte_val_bs(pte) & L_PTE_PRESENT_BS)
+#define pte_read_bs(pte)	(pte_val_bs(pte) & L_PTE_USER_BS)
+#define pte_write_bs(pte)	(pte_val_bs(pte) & L_PTE_WRITE_BS)
+#define pte_exec_bs(pte)	(pte_val_bs(pte) & L_PTE_EXEC_BS)
+#define pte_dirty_bs(pte)	(pte_val_bs(pte) & L_PTE_DIRTY_BS)
+#define pte_young_bs(pte)	(pte_val_bs(pte) & L_PTE_YOUNG_BS)
 
 #define ptep_get_and_clear_bs(__mm, __address, __ptep)			\
 ({									\
@@ -554,7 +566,7 @@ typedef void (*cpu_set_pte_ext_t)(pte_t_bs *, pte_t_bs, unsigned int);
  */
 
 #define pgd_addr_end_bs(addr, end)					\
-({	unsigned long __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;	\
+({	unsigned long __boundary = ((addr) + PGDIR_SIZE_BS) & PGDIR_MASK_BS; \
 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
 })
 
@@ -564,5 +576,35 @@ typedef void (*cpu_set_pte_ext_t)(pte_t_bs *, pte_t_bs, unsigned int);
 /* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
 /* FIXME: this is not correct */
 #define kern_addr_valid_bs(addr)	(1)
+#define pte_mkold_bs(x)			(0)
+
+#ifndef __HAVE_ARCH_PAGE_TEST_AND_CLEAR_YOUNG
+#define page_test_and_clear_young_bs(page)	(0)
+#endif
+
+#ifndef __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
+#define ptep_test_and_clear_young_bs(__vma, __address, __ptep)\
+({\
+	pte_t_bs __pte = *(__ptep);					\
+	int r = 1;							\
+	if (!pte_young_bs(__pte))					\
+		r = 0;							\
+	else								\
+		set_pte_at_bs((__vma)->vm_mm, (__address),		\
+			   (__ptep), pte_mkold_bs(__pte));		\
+	r;								\
+})              
+#endif
+
+#ifndef __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
+#define ptep_clear_flush_young_bs(__vma, __address, __ptep)		\
+({									\
+	int __young;							\
+	__young = ptep_test_and_clear_young_bs(__vma, __address, __ptep); \
+	if (__young)							\
+		flush_tlb_page_bs(__vma, __address);			\
+	__young;							\
+})
+#endif
 
 #endif

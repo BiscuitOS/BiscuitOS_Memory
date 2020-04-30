@@ -225,6 +225,8 @@ struct zonelist_bs {
 	struct zone_bs *zones[MAX_NUMNODES_BS * MAX_NR_ZONES_BS + 1]; 
 };
 
+struct task_struct;
+
 struct bootmem_data_bs;
 typedef struct pglist_data_bs {
 	struct zone_bs node_zones[MAX_NR_ZONES_BS];
@@ -240,6 +242,7 @@ typedef struct pglist_data_bs {
 	struct pglist_data_bs *pgdat_next;
 	wait_queue_head_t kswapd_wait;
 	int kswapd_max_order;
+	struct task_struct *kswapd;
 } pg_data_t_bs;
 
 extern struct pglist_data_bs contig_page_data_bs;
@@ -336,5 +339,9 @@ static inline struct zone_bs *next_zone_bs(struct zone_bs *zone)
 	for (zone = pgdat_list_bs->node_zones; zone; zone = next_zone_bs(zone))
 
 #define numa_node_id_bs()	(0)
+
+extern int zone_watermark_ok_bs(struct zone_bs *z, int order, 
+  unsigned long mark, int classzone_idx, int can_try_harder, int gfp_high);
+extern void wakeup_kswapd_bs(struct zone_bs *zone, int order);
 
 #endif

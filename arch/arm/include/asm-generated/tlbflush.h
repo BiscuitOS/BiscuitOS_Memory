@@ -215,7 +215,7 @@ extern unsigned long BiscuitOS_tlb_flags;
 				v6wbi_always_flags & \
 				v7wbi_always_flags)
 
-#define __tlb_op(f, insnarg, arg)					\
+#define __tlb_op_bs(f, insnarg, arg)					\
 	do {								\
 		if (always_tlb_flags_bs & (f))				\
 			asm("mcr " insnarg				\
@@ -230,8 +230,8 @@ extern unsigned long BiscuitOS_tlb_flags;
 #define tlb_flag_bs(f)			((always_tlb_flags_bs & (f)) || \
 					(__tlb_flag & \
 					possible_tlb_flags_bs & (f)))
-#define tlb_op_bs(f, regs, arg)		__tlb_op(f, "p15, 0, %0, " regs, arg)
-#define tlb_l2_op_bs(f, regs, arg)	__tlb_op(f, "p15, 1, %0, " regs, arg)
+#define tlb_op_bs(f, regs, arg)		__tlb_op_bs(f, "p15, 0, %0, " regs, arg)
+#define tlb_l2_op_bs(f, regs, arg)	__tlb_op_bs(f, "p15, 1, %0, " regs, arg)
 
 #define dsb_bs(option)	__asm__ __volatile__ ("dsb " #option : : : "memory")
 #define isb_bs(option) __asm__ __volatile__ ("isb " #option : : : "memory")
@@ -298,6 +298,7 @@ static inline void local_flush_tlb_kernel_page_bs(unsigned long kaddr)
 }
 
 #define __flush_tlb_one_bs(vaddr) local_flush_tlb_kernel_page_bs(vaddr)
+#define flush_tlb_page_bs(mm,addr) local_flush_tlb_kernel_page_bs(addr)
 
 /*
  * flush_pmd_entry

@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 #include "biscuitos/kernel.h"
+#include "biscuitos/init.h"
 #include "biscuitos/mm.h"
 #include "biscuitos/mempool.h"
 #include "biscuitos/highmem.h"
@@ -394,3 +395,41 @@ struct page_bs *kmap_atomic_to_page_bs(void *ptr)
 }
 
 #endif
+
+static mempool_t_bs *page_pool_bs;
+
+static void *page_pool_alloc_bs(unsigned int __nocast gfp_mask, void *data)
+{
+	unsigned int gfp = gfp_mask | (unsigned int)(long)data;
+
+	return alloc_page_bs(gfp);
+}
+
+static void page_pool_free_bs(void *page, void *data)
+{
+	__free_page_bs(page);
+}
+
+#define POOL_SIZE_BS		64
+
+static __init int init_emergency_pool_bs(void)
+{
+	struct sysinfo_bs i;
+
+	si_meminfo_bs(&i);
+
+	if (!i.totalhigh)
+		return 0;
+
+	page_pool_bs = mempool_create_bs(POOL_SIZE_BS,
+				page_pool_alloc_bs,
+				page_pool_free_bs,
+				NULL);
+	if (!page_pool_bs)
+		BUG_BS();
+
+	printk("Highmem bounch pool size: %d pages\n", POOL_SIZE_BS);
+
+	return 0;
+}
+module_initcall_bs(init_emergency_pool_bs);

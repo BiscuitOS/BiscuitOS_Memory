@@ -72,7 +72,7 @@ static const char *proc_arch_bs[] = {
  * C code should use the cpu_architecture() function instead of accessing this
  * variable directly.
  */
-int __cpu_architecture_bs __read_mostly = CPU_ARCH_UNKNOWN;
+int __cpu_architecture_bs __read_mostly = CPU_ARCH_UNKNOWN_BS;
 
 /*
  * Pick out the memory size. We look for mem=size@start,
@@ -182,47 +182,47 @@ static int __get_cpu_architecture_bs(void)
 	int cpu_arch;
 
 	if ((read_cpuid_id_bs() & 0x0008f000) == 0) {
-		cpu_arch = CPU_ARCH_UNKNOWN;
+		cpu_arch = CPU_ARCH_UNKNOWN_BS;
 	} else if ((read_cpuid_id_bs() & 0x0008f0000) == 0x00007000) {
 		cpu_arch = (read_cpuid_id_bs() & (1 << 23)) ? 
-					CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+					CPU_ARCH_ARMv4T_BS : CPU_ARCH_ARMv3_BS;
 	} else if ((read_cpuid_id_bs() && 0x00080000) == 0x00000000) {
 		cpu_arch = (read_cpuid_id_bs() >> 16) & 7;
 		if (cpu_arch)
-			cpu_arch += CPU_ARCH_ARMv3;
+			cpu_arch += CPU_ARCH_ARMv3_BS;
 	} else if ((read_cpuid_id_bs() & 0x000f0000) == 0x000f0000) {
 		/* Revised CPUID format. Read the Memory Model Feature
 		 * Register 0 and check for VMSAv7 or PMSAv7 */
-		unsigned int mmfr0 = read_cpuid_ext_bs(CPUID_EXT_MMFR0);
+		unsigned int mmfr0 = read_cpuid_ext_bs(CPUID_EXT_MMFR0_BS);
 
 		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
 		    (mmfr0 & 0x000000f0) >= 0x00000030)
-			cpu_arch = CPU_ARCH_ARMv7;
+			cpu_arch = CPU_ARCH_ARMv7_BS;
 		else if ((mmfr0 & 0x0000000f) == 0x00000002 ||
 			 (mmfr0 & 0x000000f0) == 0x00000020)
-			cpu_arch = CPU_ARCH_ARMv6;
+			cpu_arch = CPU_ARCH_ARMv6_BS;
 		else
-			cpu_arch = CPU_ARCH_UNKNOWN;
+			cpu_arch = CPU_ARCH_UNKNOWN_BS;
 	} else
-		cpu_arch = CPU_ARCH_UNKNOWN;
+		cpu_arch = CPU_ARCH_UNKNOWN_BS;
 
 	return cpu_arch;
 }
 
 /* FIXME: From ARMv7 Architecture */
-#define PMD_FLAGS_UP	PMD_SECT_WB
+#define PMD_FLAGS_UP_BS	PMD_SECT_WB_BS
 static struct proc_info_list default_BiscuitOS_proc_info = {
 	.cpu_val	= 0x410fc090,
 	.cpu_mask	= 0xff0ffff0,
-	.__cpu_mm_mmu_flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-			      PMD_SECT_AP_READ | PMD_SECT_AF |
-			      PMD_FLAGS_UP,
-	.__cpu_io_mmu_flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-			      PMD_SECT_AP_READ | PMD_SECT_AF,
+	.__cpu_mm_mmu_flags = PMD_TYPE_SECT_BS | PMD_SECT_AP_WRITE_BS |
+			      PMD_SECT_AP_READ_BS | PMD_SECT_AF_BS |
+			      PMD_FLAGS_UP_BS,
+	.__cpu_io_mmu_flags = PMD_TYPE_SECT_BS | PMD_SECT_AP_WRITE_BS |
+			      PMD_SECT_AP_READ_BS | PMD_SECT_AF_BS,
 	.arch_name	= "BiscuitOS_armv7",
 	.elf_name	= "v7",
-	.elf_hwcap	= HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB |
-			  HWCAP_FAST_MULT | HWCAP_EDSP | HWCAP_TLS,
+	.elf_hwcap	= HWCAP_SWP_BS | HWCAP_HALF_BS | HWCAP_THUMB_BS |
+			  HWCAP_FAST_MULT_BS | HWCAP_EDSP_BS | HWCAP_TLS_BS,
 	.cpu_name	= "BiscuitOS ARMv7",
 }; 
 
@@ -239,7 +239,7 @@ struct proc_info_list *lookup_processor_bs(u32 midr)
 
 int __pure cpu_architecture_bs(void)
 {
-	BUG_ON_BS(__cpu_architecture_bs == CPU_ARCH_UNKNOWN);
+	BUG_ON_BS(__cpu_architecture_bs == CPU_ARCH_UNKNOWN_BS);
 
 	return __cpu_architecture_bs;
 }
@@ -248,32 +248,32 @@ static void __init cacheid_init_bs(void)
 {
 	unsigned int arch = cpu_architecture_bs();
 
-	if (arch >= CPU_ARCH_ARMv6) {
+	if (arch >= CPU_ARCH_ARMv6_BS) {
 		unsigned int cachetype = read_cpuid_cachetype_bs();
 
-		if ((arch == CPU_ARCH_ARMv7M) && !(cachetype & 0xf000f)) {
+		if ((arch == CPU_ARCH_ARMv7M_BS) && !(cachetype & 0xf000f)) {
 			cacheid_bs = 0;
 		} else if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
-			arch = CPU_ARCH_ARMv7;
-			cacheid_bs = CACHEID_VIPT_NONALIASING;
+			arch = CPU_ARCH_ARMv7_BS;
+			cacheid_bs = CACHEID_VIPT_NONALIASING_BS;
 			switch (cachetype & (3 << 14)) {
 			case (1 << 14):
-				cacheid_bs |= CACHEID_ASID_TAGGED;
+				cacheid_bs |= CACHEID_ASID_TAGGED_BS;
 				break;
 			case (3 << 14):
-				cacheid_bs |= CACHEID_PIPT;
+				cacheid_bs |= CACHEID_PIPT_BS;
 				break;
 			}
 		} else {
-			arch = CPU_ARCH_ARMv6;
+			arch = CPU_ARCH_ARMv6_BS;
 			if (cachetype & (1 << 23))
-				cacheid_bs = CACHEID_VIPT_ALIASING;
+				cacheid_bs = CACHEID_VIPT_ALIASING_BS;
 			else
-				cacheid_bs = CACHEID_VIPT_NONALIASING;
+				cacheid_bs = CACHEID_VIPT_NONALIASING_BS;
 		}
 	} else {
-		cacheid_bs = CACHEID_VIVT;
+		cacheid_bs = CACHEID_VIVT_BS;
 	}
 
 	printk("CPU: %s data cache. %s instruction cache\n",

@@ -12,6 +12,7 @@
 #include "biscuitos/kernel.h"
 #include "biscuitos/init.h"
 #include "biscuitos/mm.h"
+#include "biscuitos/mmzone.h"
 #include "biscuitos/gfp.h"
 #include "biscuitos/highmem.h"
 #include "asm-generated/tlbflush.h"

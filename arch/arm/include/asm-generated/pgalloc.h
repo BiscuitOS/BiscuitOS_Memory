@@ -13,10 +13,10 @@
 #include "asm-generated/domain.h"
 #include "asm-generated/tlbflush.h"
 
-#define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | \
-					PMD_DOMAIN(DOMAIN_USER))
-#define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | \
-					PMD_DOMAIN(DOMAIN_KERNEL))
+#define _PAGE_USER_TABLE_BS	(PMD_TYPE_TABLE_BS | PMD_BIT4_BS | \
+					PMD_DOMAIN_BS(DOMAIN_USER_BS))
+#define _PAGE_KERNEL_TABLE_BS	(PMD_TYPE_TABLE_BS | PMD_BIT4_BS | \
+					PMD_DOMAIN_BS(DOMAIN_KERNEL_BS))
 
 
 /*              
@@ -43,8 +43,8 @@ pte_alloc_one_kernel_bs(struct mm_struct_bs *mm, unsigned long addr)
 	pte = (pte_t_bs *)__get_free_page_bs(GFP_KERNEL_BS | __GFP_REPEAT_BS |
                                                 __GFP_ZERO_BS);
 	if (pte) {
-		clean_dcache_area_bs(pte, sizeof(pte_t_bs) * PTRS_PER_PTE);
-		pte += PTRS_PER_PTE;
+		clean_dcache_area_bs(pte, sizeof(pte_t_bs) * PTRS_PER_PTE_BS);
+		pte += PTRS_PER_PTE_BS;
 	}
 
 	return pte;
@@ -56,7 +56,7 @@ pte_alloc_one_kernel_bs(struct mm_struct_bs *mm, unsigned long addr)
 static inline void pte_free_kernel_bs(pte_t_bs *pte)
 {
 	if (pte) {
-		pte -= PTRS_PER_PTE;
+		pte -= PTRS_PER_PTE_BS;
 		free_page_bs((unsigned long)pte);
 	}
 }
@@ -64,7 +64,7 @@ static inline void pte_free_kernel_bs(pte_t_bs *pte)
 static inline void __pmd_populate_bs(pmd_t_bs *pmdp, phys_addr_t pte,
                                   pmdval_t_bs prot)
 {
-	pmdval_t_bs pmdval = (pte + PTE_HWTABLE_OFF) | prot;
+	pmdval_t_bs pmdval = (pte + PTE_HWTABLE_OFF_BS) | prot;
 	pmdp[0] = __pmd_bs(pmdval);
 	pmdp[1] = __pmd_bs(pmdval + 256 * sizeof(pte_t_bs));
 	flush_pmd_entry_bs(pmdp);
@@ -89,8 +89,8 @@ pmd_populate_kernel_bs(struct mm_struct_bs *mm,
 	 * The pmd must be loaded with the physical
 	 * address of the PTE table.
 	 */
-	pte_ptr -= PTRS_PER_PTE * sizeof(void *);
-	pmdval = __pa_bs(pte_ptr) | _PAGE_KERNEL_TABLE;
+	pte_ptr -= PTRS_PER_PTE_BS * sizeof(void *);
+	pmdval = __pa_bs(pte_ptr) | _PAGE_KERNEL_TABLE_BS;
 	pmdp[0] = __pmd_bs(pmdval);
 	pmdp[1] = __pmd_bs(pmdval + 256 * sizeof(pte_t_bs));
 	flush_pmd_entry_bs(pmdp);

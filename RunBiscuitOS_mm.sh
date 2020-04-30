@@ -54,7 +54,9 @@ show_trace()
 mount_fs()
 {
 	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1.ko
-#	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1-buddy.ko
+#	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1-swap.ko
+	mkdir -p /tmpfs_bs
+	mount -t tmpfs_bs BiscuitOS_tmpfs /tmpfs_bs
 }
 
 umount_fs()

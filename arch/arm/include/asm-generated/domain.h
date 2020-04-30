@@ -29,25 +29,25 @@
  * CPUs based on ARMv6+ or the Intel XSC3 core.
  */             
 #ifndef CONFIG_IO_36
-#define DOMAIN_KERNEL		0
-#define DOMAIN_USER		1       
-#define DOMAIN_IO		2
+#define DOMAIN_KERNEL_BS		0
+#define DOMAIN_USER_BS			1       
+#define DOMAIN_IO_BS			2
 #else   
-#define DOMAIN_KERNEL		2
-#define DOMAIN_USER		1  
-#define DOMAIN_IO		0
+#define DOMAIN_KERNEL_BS		2
+#define DOMAIN_USER_BS			1  
+#define DOMAIN_IO_BS			0
 #endif
-#define DOMAIN_VECTORS		3
+#define DOMAIN_VECTORS_BS		3
 
 /*
  * Domain types
  */
-#define DOMAIN_NOACCESS		0
-#define DOMAIN_CLIENT		1  
+#define DOMAIN_NOACCESS_BS		0
+#define DOMAIN_CLIENT_BS		1  
 #ifdef CONFIG_CPU_USE_DOMAINS
-#define DOMAIN_MANAGER		3  
+#define DOMAIN_MANAGER_BS		3  
 #else
-#define DOMAIN_MANAGER		1
+#define DOMAIN_MANAGER_BS		1
 #endif
 
 #endif

@@ -24,6 +24,8 @@
 #include "biscuitos/slab.h"
 #include "biscuitos/vmalloc.h"
 #include "biscuitos/highmem.h"
+#include "biscuitos/swap.h"
+#include "biscuitos/pagevec.h"
 #include "asm-generated/percpu.h"
 
 nodemask_t_bs node_online_map_bs = { { [0] = 1UL } };
@@ -635,6 +637,20 @@ static int bad_range_bs(struct zone_bs *zone, struct page_bs *page)
 	return 0;
 }
 
+unsigned long __read_page_state_bs(unsigned offset)
+{
+	unsigned long ret = 0;
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		unsigned long in;
+
+		in = (unsigned long)&per_cpu_bs(page_states_bs, cpu) + offset;
+		ret += *((unsigned long *)in);
+	}
+	return ret;
+}
+
 void __mod_page_state_bs(unsigned offset, unsigned long delta)
 {
 	unsigned long flags;
@@ -973,6 +989,7 @@ int zone_watermark_ok_bs(struct zone_bs *z, int order, unsigned long mark,
 	}
 	return 1;
 }
+EXPORT_SYMBOL_GPL(zone_watermark_ok_bs);
 
 /*
  * The order of subdivision here is critical for the IO subsystem.
@@ -1158,10 +1175,13 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 	const int wait = gfp_mask & __GFP_WAIT_BS;
 	struct zone_bs **zones, *z;
 	struct page_bs *page;
+	struct reclaim_state_bs reclaim_state;
 	struct task_struct *p = current;
 	int i;
 	int classzone_idx;
+	int do_retry;
 	int can_try_harder;
+	int did_some_progress;
 
 	might_sleep_if(wait);
 
@@ -1181,6 +1201,7 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 
 	classzone_idx = zone_idx_bs(zones[0]);
 
+restart:
 	/* Go through the zonelist once, looking for a zone with enough free */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		if (!zone_watermark_ok_bs(z, order, z->pages_low,
@@ -1195,8 +1216,137 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 			goto got_pg;
 	}
 
-	BS_DUP();
+	for (i = 0; (z = zones[i]) != NULL; i++)
+		wakeup_kswapd_bs(z, order);
 
+	/*
+	 * Go through the zonelist again. Let __GFP_HIGH and allocations
+	 * coming from realtime tasks to go deeper into reserves
+	 *
+	 * This is the last chance, in general, before the goto nopage.
+	 * Ignore cpuset if GFP_ATOMIC (!wait) rather than fail alloc.
+	 */
+	for (i = 0; (z = zones[i]) != NULL; i++) {
+		if (!zone_watermark_ok_bs(z, order, z->pages_min,
+					classzone_idx, can_try_harder,
+					gfp_mask & __GFP_HIGH_BS))
+			continue;
+
+		if (wait && !cpuset_zone_allowed_bs(z))
+			continue;
+
+		page = buffered_rmqueue_bs(z, order, gfp_mask);
+		if (page)
+			goto got_pg;
+	}
+
+	/* This allocation should allow future memory freeing */
+
+	if (((p->flags & PF_MEMALLOC_BS) || 
+			unlikely(test_thread_flag(TIF_MEMDIE))) &&
+			!in_interrupt()) {
+		if (!(gfp_mask & __GFP_NOMEMALLOC_BS)) {
+			/* go through the zonelist yet again, ignore mins */
+			for (i = 0; (z = zones[i]) != NULL; i++) {
+				if (!cpuset_zone_allowed_bs(z))
+					continue;
+
+				page = buffered_rmqueue_bs(z, order, gfp_mask);
+				if (page)
+					goto got_pg;
+			}
+		}
+		goto nopage;
+	}
+
+	/* Atomic allocations - we can't balance anything */
+	if (!wait)
+		goto nopage;
+
+rebalance:
+	cond_resched();
+
+	/* We now go into synchronous reclaim */
+	p->flags |= PF_MEMALLOC_BS;
+	reclaim_state.reclaimed_slab = 0;
+	p->reclaim_state = (struct reclaim_state *)&reclaim_state;
+
+	did_some_progress = try_to_free_pages_bs(zones, gfp_mask, order);
+
+	p->reclaim_state = NULL;
+	p->flags &= ~PF_MEMALLOC_BS;
+
+	cond_resched();
+
+	if (likely(did_some_progress)) {
+		/*
+		 * Go through the zonelist yet one more time, keep
+		 * very high watermark here, this is only to catch
+		 * a parallel oom killing, we must fail if we're still
+		 * under heavy pressure.
+		 */
+		for (i = 0; (z = zones[i]) != NULL; i++) {
+			if (!zone_watermark_ok_bs(z, order, z->pages_min,
+					classzone_idx, can_try_harder,
+					gfp_mask & __GFP_HIGH))
+				continue;
+
+			if (!cpuset_zone_allowed_bs(z))
+				continue;
+
+			page = buffered_rmqueue_bs(z, order, gfp_mask);
+			if (page)
+				goto got_pg;
+		}
+	} else if ((gfp_mask & __GFP_FS_BS) && 
+					!(gfp_mask & __GFP_NORETRY_BS)) {
+		/*
+		 * Go through the zonelist yet one more time, keep
+		 * very high watermark here, this is only to catch
+		 * a parallel oom killing, we must fail if we're still
+		 * under heavy pressure.
+		 */
+		for (i = 0; (z = zones[i]) != NULL; i++) {
+			if (!zone_watermark_ok_bs(z, order, z->pages_high,
+					classzone_idx, 0, 0))
+				continue;
+
+			if (!cpuset_zone_allowed_bs(z))
+				continue;
+
+			page = buffered_rmqueue_bs(z, order, gfp_mask);
+			if (page)
+				goto got_pg;
+		}
+		out_of_memory_bs(gfp_mask);
+		goto restart;
+	}
+
+        /*
+         * Don't let big-order allocations loop unless the caller explicitly
+         * requests that.  Wait for some write requests to complete then retry.
+         *
+         * In this implementation, __GFP_REPEAT means __GFP_NOFAIL for order
+         * <= 3, but that may not be true in other implementations.
+         */
+	do_retry = 0;
+	if (!(gfp_mask & __GFP_NORETRY_BS)) {
+		if ((order <= 3) || (gfp_mask & __GFP_REPEAT_BS))
+			do_retry = 1;
+		if (gfp_mask & __GFP_NOFAIL_BS)
+			do_retry = 1;
+	}
+	if (do_retry) {
+		BS_DUP();
+		goto rebalance;
+	}
+
+nopage:
+	if (!(gfp_mask & __GFP_NOWARN_BS)) {
+		printk(KERN_INFO "%s: page allocation failure."
+				" order:%d, mode:0x%x\n",
+			p->comm, order, gfp_mask);
+	}
 got_pg:
 	zone_statistics_bs(zonelist, z);
 	return page;
@@ -1218,6 +1368,15 @@ fastcall_bs unsigned long get_zeroed_page_bs(unsigned int __nocast gfp_mask)
 		return (unsigned long) page_address_bs(page);
 	return 0;
 }
+
+void __pagevec_free_bs(struct pagevec_bs *pvec)
+{
+	int i = pagevec_count_bs(pvec);
+
+	while (--i >= 0)
+		free_hot_cold_page_bs(pvec->pages[i], pvec->cold);
+}
+EXPORT_SYMBOL_GPL(__pagevec_free_bs);
 
 fastcall_bs void free_pages_bs(unsigned long addr, unsigned int order)
 {
@@ -1672,3 +1831,20 @@ void *__init alloc_large_system_hash_bs(const char *tablename,
 
 	return table;
 }
+
+void si_meminfo_bs(struct sysinfo_bs *val)
+{
+	val->totalram = totalram_pages_bs;
+	val->sharedram = 0;
+	val->freeram = nr_free_pages_bs();
+	val->bufferram = 0;
+#ifdef CONFIG_HIGHMEM_BS
+	val->totalhigh = totalhigh_pages_bs;
+	val->freehigh = nr_free_highpages_bs();
+#else
+	val->totalhigh = 0;
+	val->freehigh = 0;
+#endif
+	val->mem_unit = PAGE_SIZE_BS;
+}
+EXPORT_SYMBOL_GPL(si_meminfo_bs);

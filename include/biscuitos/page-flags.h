@@ -90,6 +90,10 @@ struct page_state_bs {
 };
 
 extern void __mod_page_state_bs(unsigned offset, unsigned long delta);
+extern unsigned long __read_page_state_bs(unsigned offset);
+
+#define read_page_state_bs(member)					\
+	__read_page_state_bs(offsetof(struct page_state_bs, member))
 
 #define mod_page_state_bs(member, delta)	\
 	__mod_page_state_bs(offsetof(struct page_state_bs, member), (delta))
@@ -153,5 +157,44 @@ extern void __mod_page_state_bs(unsigned offset, unsigned long delta);
 #else
 #define PageCompound_bs(page)		0
 #endif
+
+#define SetPageLRU_bs(page)		set_bit(PG_lru_bs, &(page)->flags)
+#define PageLRU_bs(page)		test_bit(PG_lru_bs, &(page)->flags)
+#define TestSetPageLRU_bs(page)		test_and_set_bit(PG_lru_bs, \
+								&(page)->flags)
+#define TestClearPageLRU_bs(page)	test_and_clear_bit(PG_lru_bs, \
+								&(page)->flags)
+
+/* PG_active */
+#define PageActive_bs(page)		test_bit(PG_active_bs, \
+								&(page)->flags)
+#define SetPageActive_bs(page)		set_bit(PG_active_bs, \
+								&(page)->flags)
+#define ClearPageActive_bs(page)	clear_bit(PG_active_bs, \
+								&(page)->flags)
+#define TestClearPageActive_bs(page)	test_and_clear_bit(PG_active_bs, \
+								&(page)->flags)
+#define TestSetPageActive_bs(page)	test_and_set_bit(PG_active_bs, \
+								&(page)->flags)
+
+/* PG_referenced */
+#define PageReferenced_bs(page)		test_bit(PG_referenced_bs, \
+								&(page)->flags)
+#define SetPageReferenced_bs(page)	set_bit(PG_referenced_bs, \
+								&(page)->flags)
+#define ClearPageReferenced_bs(page)	clear_bit(PG_referenced_bs, \
+								&(page)->flags)
+#define TestClearPageReferenced_bs(page) test_and_clear_bit(PG_referenced_bs, \
+								&(page)->flags)
+
+/* PG_loced */
+#define PageLocked_bs(page)		test_bit(PG_locked_bs, &(page)->flags)
+#define SetPageLocked_bs(page)		set_bit(PG_locked_bs, \
+								&(page)->flags)
+#define TestSetPageLocked_bs(page)	test_and_set_bit(PG_locked_bs, \
+								&(page)->flags)
+#define ClearPageLocked_bs(page)	clear_bit(PG_locked_bs, &(page)->flags)
+#define TestClearPageLocked_bs(page)	test_and_clear_bit(PG_locked_bs, \
+								&(page)->flags)
 
 #endif

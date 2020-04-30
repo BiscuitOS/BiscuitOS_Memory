@@ -6,4 +6,6 @@
 #define MAX_PRIO_BS		(MAX_RT_PROT_BS + 40)
 #define rt_task_bs(p)		(unlikely((p)->prio < MAX_RT_PRIO_BS))
 
+static inline void refrigerator_bs(unsigned long flag) {}
+
 #endif

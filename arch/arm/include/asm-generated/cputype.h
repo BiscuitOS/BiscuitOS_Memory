@@ -1,15 +1,15 @@
 #ifndef _BISCUITOS_ARM_CPUTYPE_H
 #define _BISCUITOS_ARM_CPUTYPE_H
 
-#define CPUID_ID		0
-#define CPUID_CACHETYPE		1
-#define CPUID_TCM		2
-#define CPUID_TLBTYPE		3
-#define CPUID_MPUIR		4
-#define CPUID_MPIDR		5
-#define CPUID_REVIDR		6
+#define CPUID_ID_BS		0
+#define CPUID_CACHETYPE_BS	1
+#define CPUID_TCM_BS		2
+#define CPUID_TLBTYPE_BS	3
+#define CPUID_MPUIR_BS		4
+#define CPUID_MPIDR_BS		5
+#define CPUID_REVIDR_BS		6
 
-#define CPUID_EXT_MMFR0		"c1, 4"
+#define CPUID_EXT_MMFR0_BS	"c1, 4"
 
 #define __stringify_1_bs(x...)	#x
 #define __stringify_bs(x...)	__stringify_1_bs(x)
@@ -48,12 +48,12 @@
  */
 static inline unsigned int __attribute_const__ read_cpuid_id_bs(void)
 {
-	return read_cpuid_bs(CPUID_ID);
+	return read_cpuid_bs(CPUID_ID_BS);
 }
 
 static inline unsigned int __attribute_const__ read_cpuid_cachetype_bs(void)
 {
-	return read_cpuid_bs(CPUID_CACHETYPE);
+	return read_cpuid_bs(CPUID_CACHETYPE_BS);
 }
 
 #endif
