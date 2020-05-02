@@ -1,11 +1,16 @@
 #ifndef _BISCUITOS_MM_H
 #define _BISCUITOS_MM_H
 
+#include <linux/mm_types.h>
 #include "biscuitos/mmzone.h"
 #include "biscuitos/gfp.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/pgtable.h"
 #include "asm-generated/page.h"
+
+#define VM_NORESERVE_BS		0x00200000     /* should the VM suppress accounting */
+#define VM_RESERVED_BS		0x00080000    /* Don't unmap it from swap_out */
+#define VM_ACCOUNT_BS		0x00100000    /* Is a VM accounted object */
 
 #ifdef ARCH_HAS_ATOMIC_UNSIGNED
 typedef unsigned page_flags_t_bs;
@@ -71,6 +76,12 @@ struct page_bs {
 	void *virtual;                  /* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* WANT_PAGE_VIRTUAL */
+};
+
+/* FIXME: */
+struct shmem_page {
+	struct page page;
+	struct page_bs page_bs;
 };
 
 /*
@@ -202,5 +213,7 @@ extern void show_free_areas_bs(void);
 struct sysinfo_bs;
 extern void si_meminfo_bs(struct sysinfo_bs *);
 extern int __set_page_dirty_nobuffers_bs(struct page *page);
+extern void PAGE_TO_PAGE_BS(struct page *page, struct page_bs *page_bs);
+extern void PAGE_BS_TO_PAGE(struct page *page, struct page_bs *page_bs);
 
 #endif

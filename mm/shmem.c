@@ -29,11 +29,20 @@
 #include <linux/dcache.h>
 #include "biscuitos/kernel.h"
 #include "biscuitos/init.h"
+#include "biscuitos/fs.h"
 #include "biscuitos/shmem_fs.h"
 #include "biscuitos/pagemap.h"
 #include "asm-generated/page.h"
 #include "biscuitos/slab.h"
 #include "biscuitos/mm.h"
+#include "biscuitos/highmem.h"
+
+/*
+ * ZERO_PAGE is a global shared page that is always zero: used
+ * for zero-mapped memory areas etc..
+ */
+extern struct page_bs *empty_zero_page_bs;
+#define ZERO_PAGE_BS(vaddr)	(empty_zero_page_bs)
 
 /* This magic number is used in glibc for posix shared memory */
 #define TMPFS_MAGIC_BS		0x90919416
@@ -48,8 +57,24 @@
 #define SHMEM_MAX_BYTES_BS	((unsigned long long)SHMEM_MAX_INDEX_BS << \
 						PAGE_CACHE_SHIFT_BS)
 
+#define VM_ACCT_BS(size)	(PAGE_CACHE_ALIGN_BS(size) >> PAGE_SHIFT_BS)
+
 /* Pretend that each entry is of this size in directory's i_size */
 #define BOGO_DIRENT_SIZE_BS	20
+
+/* Flag allocation requirements to shmem_getpage and shmem_swp_alloc */
+enum sgp_type_bs {
+	SGP_QUICK_BS,	/* don't try more than file page cache lookup */
+	SGP_READ_BS,	/* don't exceed i_size, don't allocate page */
+	SGP_CACHE_BS,	/* don't exceed i_size, may allocate page */
+	SGP_WRITE_BS,	/* may exceed i_size, may allocate page */
+};
+
+/* FIXME: */
+struct shmem_page_bs {
+	struct page page;
+	struct page_bs page_bs;
+};
 
 static kmem_cache_t_bs *shmem_inode_cachep_bs;
 static struct vfsmount *shm_mnt_bs;
@@ -60,6 +85,9 @@ static struct inode_operations shmem_special_inode_operations_bs;
 static struct inode_operations shmem_inode_operations_bs;
 static struct file_operations shmem_file_operations_bs;
 static struct inode_operations shmem_dir_inode_operations_bs;
+static struct inode_operations shmem_symlink_inline_operations_bs;
+static struct inode * shmem_get_inode_bs(struct super_block *sb, 
+							int mode, dev_t dev);
 
 static inline struct shmem_sb_info_bs *SHMEM_SB_BS(struct super_block *sb)
 {
@@ -275,6 +303,57 @@ static void shmem_put_super_bs(struct super_block *sb)
 	sb->s_fs_info = NULL;
 }
 
+static inline void shmem_swp_balance_unmap_bs(void)
+{
+	/*
+	 * When passing a pointer to an i_direct entry, to code which
+	 * also handles indirect entries and so will shmem_swp_unmap,
+	 * we must arrange for the preempt count to remain in balance.
+	 * What kmap_atomic of a lowmem page does depends on config
+	 * and architecture, so pretend to kmap_atomic some lowmem page.
+	 */
+	(void) kmap_atomic_bs(ZERO_PAGE_BS(0), KM_USER1_BS);
+}
+
+static inline void shmem_swp_unmap_bs(swp_entry_t_bs *entry)
+{
+	kunmap_atomic_bs(entry, KM_USER1_BS);
+}
+
+/*
+ * ... whereas tmpfs objects are accounted incrementally as
+ * pages are allocated, in order to allow huge sparse files.
+ * shmem_getpage reports shmem_acct_block failure as -ENOSPC not -ENOMEM,
+ * so that a failure on a sparse tmpfs mapping will give SIGBUS not OOM.
+ */
+static inline int shmem_acct_block_bs(unsigned long flags)
+{
+	BS_DUP();
+	return 0;
+}
+
+static inline struct page_bs *
+shmem_alloc_page_bs(unsigned int __nocast gfp, 
+		struct shmem_inode_info_bs *info, unsigned long idx)
+{
+	BS_DUP();
+	return 0;
+}
+
+/*
+ * shmem_getpage - either get the page from swap or allocate a new one
+ *
+ * If we allocate a new one we do not mark it dirty. That's up to the
+ * vm. If we swap it in we mark it dirty since we also free the swap
+ * entry since a page cannot live in both the swap and page cache
+ */
+static int shmem_getpage_bs(struct inode *inode, unsigned long idx,
+		struct shmem_page **pagep, enum sgp_type_bs sgp, int *type)
+{
+	BS_DUP();
+	return 0;
+}
+
 /*
  * Move the page from the page cache to the swap cache.
  */
@@ -348,6 +427,39 @@ static int shmem_create_bs(struct inode *dir, struct dentry *dentry, int mode,
 }
 
 /*
+ * File creation. Allocate an inode, and we're done..
+ */
+static int
+#ifndef CONFIG_BISCUITOS_5
+shmem_mknod_bs(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+#else
+shmem_mknod_bs(struct inode *dir, struct dentry *dentry, 
+						umode_t mode, dev_t dev)
+#endif
+{
+	struct inode *inode = shmem_get_inode_bs(dir->i_sb, mode, dev);
+	int error = -ENOSPC;
+
+	if (inode) {
+		if (dir->i_mode & S_ISGID) {
+			inode->i_gid = dir->i_gid;
+			if (S_ISDIR(mode))
+				inode->i_mode |= S_ISGID;
+		}
+		dir->i_size += BOGO_DIRENT_SIZE_BS;
+#ifndef CONFIG_BISCUITOS_5
+		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+#else
+		dir->i_ctime = dir->i_mtime = current_time(inode);
+#endif
+		d_instantiate(dentry, inode);
+		dget(dentry); /* Extra count - pin the dentry in core */
+		error = 0;
+	}
+	return error;
+}
+
+/*
  * Link a file..
  */
 static int shmem_link_bs(struct dentry *old_dentry, struct inode *dir,
@@ -359,14 +471,58 @@ static int shmem_link_bs(struct dentry *old_dentry, struct inode *dir,
 
 static int shmem_unlink_bs(struct inode *dir, struct dentry *dentry)
 {
-	BS_DUP();
+	struct inode *inode = dentry->d_inode;
+
+	if (inode->i_nlink > 1 && !S_ISDIR(inode->i_mode)) {
+		struct shmem_sb_info_bs *sbinfo = SHMEM_SB_BS(inode->i_sb);
+
+		if (sbinfo) {
+			spin_lock(&sbinfo->stat_lock);
+			sbinfo->free_inodes++;
+			spin_unlock(&sbinfo->stat_lock);
+		}
+	}
+
+	dir->i_size -= BOGO_DIRENT_SIZE_BS;
+#ifdef CONFIG_BISCUITOS_5
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = current_time(inode);
+	drop_nlink(inode);
+#else
+	inode->i_ctime = dir->i_ctime = dir->i_mtime =  CURRENT_TIME;
+	inode->i_nlink--;
+#endif
+	dput(dentry);	/* Undo the count from "create" - this does all the work */
 	return 0;
 }
 
 static int shmem_symlink_bs(struct inode *dir, struct dentry *dentry,
 					const char *symname)
 {
-	BS_DUP();
+	int error;
+	int len;
+	struct inode *inode;
+	struct shmem_page *page = NULL;
+	struct shmem_inode_info_bs *info;
+
+	len = strlen(symname) + 1;
+	if (len > PAGE_CACHE_SIZE_BS)
+		return -ENAMETOOLONG;
+
+	inode = shmem_get_inode_bs(dir->i_sb, S_IFLNK | S_IRWXUGO, 0);
+	if (!inode)
+		return -ENOSPC;
+
+	info = SHMEM_I_BS(inode);
+	inode->i_size = len - 1;
+	if (len <= (char *)inode - (char *)info) {
+		/* do it inline */
+		memcpy(info, symname, len);
+		inode->i_op = &shmem_symlink_inline_operations_bs;
+	} else {
+		error = shmem_getpage_bs(inode, 0, &page, SGP_WRITE_BS, NULL);
+	}
+
+
 	return 0;
 }
 
@@ -377,29 +533,29 @@ static int shmem_mkdir_bs(struct inode *dir, struct dentry *dentry,
 static int shmem_mkdir_bs(struct inode *dir, struct dentry *dentry, int mode)
 #endif
 {
-	BS_DUP();
+	int error;
+
+	if ((error = shmem_mknod_bs(dir, dentry, mode | S_IFDIR, 0)))
+		return error;
+#ifdef CONFIG_BISCUITOS_5
+	inc_nlink(dir);
+#else
+	dir->i_nlink++;
+#endif
 	return 0;
 }
 
 static int shmem_rmdir_bs(struct inode *dir, struct dentry *dentry)
 {
-	BS_DUP();
-	return 0;
-}
+	if (!simple_empty(dentry))
+		return -ENOTEMPTY;
 
-/*
- * File creation. Allocate an inode, and we're done..
- */
-static int
-#ifndef CONFIG_BISCUITOS_5
-shmem_mknod_bs(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+#ifdef CONFIG_BISCUITOS_5
+	drop_nlink(dir);
 #else
-shmem_mknod_bs(struct inode *dir, struct dentry *dentry, 
-						umode_t mode, dev_t dev)
+	dir->i_nlink--;
 #endif
-{
-	BS_DUP();
-	return 0;
+	return shmem_unlink_bs(dir, dentry);
 }
 
 /*
@@ -417,7 +573,38 @@ static int shmem_rename_bs(struct inode *old_dir, struct dentry *old_dentry,
 		unsigned int flags)
 #endif
 {
-	BS_DUP();
+	struct inode *inode = old_dentry->d_inode;
+	int they_are_dirs = S_ISDIR(inode->i_mode);
+
+	if (!simple_empty(new_dentry))
+		return -ENOTEMPTY;
+
+	if (new_dentry->d_inode) {
+		(void) shmem_unlink_bs(new_dir, new_dentry);
+		if (they_are_dirs)
+#ifdef CONFIG_BISCUITOS_5
+			drop_nlink(old_dir);
+	} else if (they_are_dirs) {
+		drop_nlink(old_dir);
+		inc_nlink(new_dir);
+	}
+#else
+			old_dir->i_nlink--;
+	} else if (
+		old_dir->i_nlink--;
+		new_dir->i_nlink++;
+	)
+#endif
+
+	old_dir->i_size	-= BOGO_DIRENT_SIZE_BS;
+	new_dir->i_size += BOGO_DIRENT_SIZE_BS;
+	old_dir->i_ctime = old_dir->i_mtime =
+	new_dir->i_ctime = new_dir->i_mtime =
+#ifdef CONFIG_BISCUITOS_5
+	inode->i_ctime = current_time(inode);
+#else
+	inode->i_ctime = CURRENT_TIME;
+#endif
 	return 0;
 }
 
@@ -446,6 +633,9 @@ shmem_get_inode_bs(struct super_block *sb, int mode, dev_t dev)
 		inode->i_gid = current->fsgid;
 		inode->i_blksize = PAGE_CACHE_SIZE_BS;
 #else
+		/* FIXME: Legacy inode doesn't support i_ino, if i_ino 
+		 * doesn't exist and dentry can't establish!  */
+		inode->i_ino = get_next_ino();
 		inode->i_uid = current_fsuid();
 		inode->i_gid = current_fsgid();
 #endif
@@ -487,20 +677,37 @@ shmem_get_inode_bs(struct super_block *sb, int mode, dev_t dev)
 			inode->i_fop = &simple_dir_operations;
 			break;
 		case S_IFLNK:
-			BS_DUP();
+			/*
+			 * Must not load anything in the rbtree,
+			 * mpol_free_shared_policy will not be called.
+			 */
+			mpol_shared_policy_init_bs(&info->policy);
 			break;
 		}
 	} else if (sbinfo) {
-#ifndef CONFIG_BISCUITOS_5
 		spin_lock(&sbinfo->stat_lock);
 		sbinfo->free_inodes++;
-		spin_unlock(&sbinfo->start_lock);
-#else
-		sbinfo->free_inodes++;
-#endif
+		spin_unlock(&sbinfo->stat_lock);
 	}
 	return inode;
 }
+
+static struct inode_operations shmem_symlink_inline_operations_bs = {
+#ifndef CONFIG_BISCUITOS_5
+	.readlink	= generic_readlink,
+	.follow_link	= shmem_follow_link_inline_bs,
+#endif
+
+#ifdef CONFIG_TMPFS_XATTR_BS
+#ifdef CONFIG_BISCUITOS_5
+	.listxattr	= generic_listxattr,
+#else
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.removexattr	= generic_removexattr,
+#endif
+#endif
+};
 
 static struct inode_operations shmem_dir_inode_operations_bs = {
 #ifdef CONFIG_TMPFS_BS

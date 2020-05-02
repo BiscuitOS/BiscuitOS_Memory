@@ -1848,3 +1848,44 @@ void si_meminfo_bs(struct sysinfo_bs *val)
 	val->mem_unit = PAGE_SIZE_BS;
 }
 EXPORT_SYMBOL_GPL(si_meminfo_bs);
+
+/* FIXME: Conver between Common page and page_bs */
+
+void PAGE_TO_PAGE_BS(struct page *page, struct page_bs *page_bs)
+{
+	if (!page)
+		page_bs = NULL;
+	if (!page_bs)
+		return;
+	page_bs->flags = page->flags;
+	page_bs->_count = page->_refcount;
+	page_bs->_mapcount = page->_mapcount;
+	page_bs->private = page->private;
+	page_bs->mapping = page->mapping;
+#if defined(WANT_PAGE_VIRTUAL)
+	page_bs->virtual = page->virtual;
+#endif
+	list_replace(&page->lru, &page_bs->lru);
+}
+EXPORT_SYMBOL_GPL(PAGE_TO_PAGE_BS);
+
+void PAGE_BS_TO_PAGE(struct page *page, struct page_bs *page_bs)
+{
+	if (!page_bs) {
+		page = NULL;
+		return;
+	}
+	if (!page)
+		return;
+
+	page->flags = page_bs->flags;
+	page->_refcount = page_bs->_count;
+	page->_mapcount = page_bs->_mapcount;
+	page->private = page_bs->private;
+	page->mapping = page_bs->mapping;
+#if defined(WANT_PAGE_VIRTUAL)
+	page->virtual = page_bs->virtual;
+#endif
+	list_replace(&page_bs->lru, &page->lru);
+}
+EXPORT_SYMBOL_GPL(PAGE_BS_TO_PAGE);

@@ -197,4 +197,14 @@ extern unsigned long __read_page_state_bs(unsigned offset);
 #define TestClearPageLocked_bs(page)	test_and_clear_bit(PG_locked_bs, \
 								&(page)->flags)
 
+/* PG_uptodate */
+#define PageUptodate_bs(page)		test_bit(PG_uptodate_bs, \
+								&(page)->flags)
+#ifndef SetPageUptodate_bs
+#define SetPageUptodate_bs(page)	set_bit(PG_uptodate_bs, \
+								&(page)->flags)
+#endif  
+#define ClearPageUptodate_bs(page)	clear_bit(PG_uptodate_Bs, \
+								&(page)->flags)
+
 #endif
