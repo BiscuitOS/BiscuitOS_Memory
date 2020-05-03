@@ -204,7 +204,7 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 
 	start_kernel_bs();
 
-	printk("Hello BiscuitOS: Linux 2.6.12.6 MMU\n");
+	printk("Hello BiscuitOS: Linux 2.6.13 MMU\n");
 
 	return 0;
 }
