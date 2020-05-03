@@ -1,5 +1,5 @@
 /*
- * BiscuitOS (mm)
+ * BiscuitOS Memory Manager (MMU)
  *
  * (C) 2020.04.14 BuddyZhang1 <buddy.zhang@aliyun.com>
  *
@@ -7,33 +7,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
-/*
- * BiscuitOS RAM on DTS:
- *
- *       reserved-memory {
- *               #address-cells = <1>;
- *               #size-cells = <1>;
- *               ranges;
- *
- *               BiscuitOS_memory: memory@70000000 {
- *                       reg = <0x70000000 0x4000000>;
- *               };
- *
- *               vram: vram@4c000000 {
- *                       compatible = "shared-dma-pool";
- *                       reg = <0x4c000000 0x00800000>;
- *                       no-map;
- *               };
- *       };
- *
- *       BiscuitOS {
- *               compatible = "BiscuitOS,mm";
- *               status = "okay";
- *               ram = <&BiscuitOS_memory>;
- *       };
- */
-
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -48,16 +21,16 @@
 
 /* BiscuitOS Physical and Virtual space Layout information */
 phys_addr_t BiscuitOS_ram_base;
-phys_addr_t BiscuitOS_ram_size;
+static phys_addr_t BiscuitOS_ram_size;
 phys_addr_t swapper_pg_dir_bs;
 u32 BiscuitOS_PAGE_OFFSET;
-u32 BiscuitOS_high_size;
-u32 BiscuitOS_normal_size;
 u32 BiscuitOS_dma_size;
 u32 BiscuitOS_vmalloc_size;
-u32 BiscuitOS_pkmap_size;
-u32 BiscuitOS_pkmap_last;
-u32 BiscuitOS_fixmap_size;
+static u32 BiscuitOS_high_size;
+static u32 BiscuitOS_normal_size;
+static u32 BiscuitOS_pkmap_size;
+static u32 BiscuitOS_pkmap_last;
+static u32 BiscuitOS_fixmap_size;
 u32 BiscuitOS_fixmap_top;
 
 EXPORT_SYMBOL_GPL(BiscuitOS_ram_base);
@@ -261,4 +234,4 @@ module_platform_driver(BiscuitOS_memory_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("BiscuitOS <buddy.zhang@aliyun.com>");
-MODULE_DESCRIPTION("BiscuitOS Memory Project");
+MODULE_DESCRIPTION("BiscuitOS Memory Manager Project");

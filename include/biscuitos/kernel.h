@@ -32,7 +32,8 @@ struct sysinfo_bs {
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
 
-#define BS_DUP()  printk("Expand..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
+//#define BS_DUP()  printk("Expand..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
+#define BS_DUP()
 #define BS_DONE() printk("Done..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
 
 #define bs_debug_enable()				\

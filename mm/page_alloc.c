@@ -1216,9 +1216,11 @@ restart:
 			goto got_pg;
 	}
 
+	BS_DUP();
 	for (i = 0; (z = zones[i]) != NULL; i++)
 		wakeup_kswapd_bs(z, order);
 
+	BS_DUP();
 	/*
 	 * Go through the zonelist again. Let __GFP_HIGH and allocations
 	 * coming from realtime tasks to go deeper into reserves
@@ -1695,6 +1697,15 @@ unsigned int nr_free_buffer_pages_bs(void)
 {
 	return nr_free_zone_pages_bs(GFP_USER_BS & GFP_ZONEMASK_BS);
 }
+
+/*
+ * Amount of free RAM allocation within zones
+ */
+unsigned int nr_free_pagecache_pages_bs(void)
+{
+	return nr_free_zone_pages_bs(GFP_HIGHUSER_BS & GFP_ZONEMASK_BS);
+}
+EXPORT_SYMBOL_GPL(nr_free_pagecache_pages_bs);
 
 /*
  * Initialise min_free_kbytes.

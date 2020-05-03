@@ -104,6 +104,7 @@ static int isolate_lru_pages_bs(int nr_to_scan, struct list_head *src,
 	int scan = 0;
 
 	while (scan++ < nr_to_scan && !list_empty(src)) {
+		BS_DUP();
 		page = lru_to_page_bs(src);
 		prefetchw_prev_lru_page_bs(page, src, flags);
 
@@ -190,7 +191,7 @@ refill_inactive_zone_bs(struct zone_bs *zone, struct scan_control_bs *sc)
 	 *
 	 * A 100% value of vm_swappiness overrides this algorithm altogether.
 	 */
-	swap_tendency = mapped_ration / 2 + distress + vm_swappiness;
+	swap_tendency = mapped_ration / 2 + distress + vm_swappiness_bs;
 
         /*
          * Now use this metric to decide whether to start moving mapped memory
@@ -206,7 +207,7 @@ refill_inactive_zone_bs(struct zone_bs *zone, struct scan_control_bs *sc)
 		list_del(&page->lru);
 		if (page_mapped_bs(page)) {
 			if (!reclaim_mapped ||
-			   (total_swap_pages == 0 && PageAnon_bs(page)) ||
+			   (total_swap_pages_bs == 0 && PageAnon_bs(page)) ||
 			    page_referenced_bs(page, 0, sc->priority <= 0)) {
 				list_add(&page->lru, &l_active);
 				continue;
@@ -244,7 +245,6 @@ shrink_zone_bs(struct zone_bs *zone, struct scan_control_bs *sc)
 
 	sc->nr_to_reclaim = sc->swap_cluster_max;
 
-	BS_DUP();
 	while (nr_active || nr_inactive) {
 		if (nr_active) {
 			sc->nr_to_scan = min(nr_active,
@@ -428,6 +428,41 @@ scan:
 
 			lru_pages += zone->nr_active + zone->nr_inactive;
 		}
+
+		/*
+		 * Now scan the zone in the dma->highmem direction, stopping
+		 * at the last zone which needs scanning.
+		 *
+		 * We do this because the page allocator works in the opposite
+		 * direction.  This prevents the page allocator from allocating
+		 * pages behind kswapd's direction of progress, which would
+		 * cause too much scanning of the lower zones.
+		 */
+		for (i = 0; i <= end_zone; i++) {
+			struct zone_bs *zone = pgdat->node_zones + i;
+
+			if (zone->present_pages == 0)
+				continue;
+
+			if (zone->all_unreclaimable && priority != 
+							DEF_PRIORITY_BS)
+				continue;
+
+			if (nr_pages == 0) { /* Not software suspend */
+				if (!zone_watermark_ok_bs(zone, order,
+					zone->pages_high, end_zone, 0, 0))
+					all_zones_ok = 0;
+			}
+			zone->temp_priority = priority;
+			if (zone->prev_priority > priority)
+				zone->prev_priority = priority;
+			sc.nr_scanned = 0;
+			sc.nr_reclaimed = 0;
+			sc.priority = priority;
+			sc.swap_cluster_max = nr_pages ? nr_pages :
+							SWAP_CLUSTER_MAX_BS;
+			shrink_zone_bs(zone, &sc);
+		}
 	} 
 out:
 	return 0;
@@ -527,6 +562,7 @@ static int __init kswapd_init_bs(void)
 	swap_setup_bs();
 	for_each_pgdat_bs(pgdat)
 		pgdat->kswapd = kthread_run(kswapd_bs, pgdat, "kswapd-bs%d", 0);
+	total_memory_bs = nr_free_pagecache_pages_bs();
 	return 0;
 }
 module_initcall_bs(kswapd_init_bs);

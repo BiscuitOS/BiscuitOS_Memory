@@ -18,15 +18,13 @@
 
 static int test_kswap(void)
 {
-	pg_data_t_bs *pgdat = NODE_DATA_BS(0);
-	struct zone_bs *zone = &pgdat->node_zones[0];
-	int order = 6;
-
 	for ( ; ;) {
-			alloc_page_bs(GFP_KERNEL_BS);
+			struct page_bs *page_bs = alloc_page_bs(GFP_KERNEL_BS);
+			if (!page_bs) {
+				alloc_page_bs(GFP_KERNEL_BS);
+				break;
+			}
 	}
-	printk("ZONE: %s\n", zone->name);
-	wakeup_kswapd_bs(zone, 0);
 
 	return 0;
 }

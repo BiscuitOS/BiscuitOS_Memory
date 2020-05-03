@@ -53,6 +53,8 @@
 #define GFP_NOFS_BS		(__GFP_WAIT_BS | __GFP_IO_BS)
 #define GFP_KERNEL_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
 #define GFP_USER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
+#define GFP_HIGHUSER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS | \
+						 __GFP_HIGHMEM_BS)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */

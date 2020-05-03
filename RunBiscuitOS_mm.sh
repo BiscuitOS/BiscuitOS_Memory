@@ -51,17 +51,9 @@ show_trace()
 	cat /sys/kernel/debug/tracing/trace
 }
 
-NAME=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-
 mount_fs()
 {
 	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1.ko
-#	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1-swap.ko
-	mkdir -p /tmpfs_bs
-	mount -t tmpfs_bs BiscuitOS_tmpfs /tmpfs_bs
-	cd /tmpfs_bs
-	mkdir -p ${NAME}
-	ln -s ${NAME} PPP
 }
 
 umount_fs()

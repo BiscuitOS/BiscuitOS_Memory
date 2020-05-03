@@ -63,5 +63,7 @@ extern int try_to_free_pages_bs(struct zone_bs **zones,
 			unsigned int gfp_mask, unsigned int order);
 
 extern void lru_add_drain_bs(void);
+extern unsigned int nr_free_pagecache_pages_bs(void);
+extern long total_swap_pages_bs;
 
 #endif

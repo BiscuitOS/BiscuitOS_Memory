@@ -144,10 +144,10 @@ void lru_add_drain_bs(void)
 	struct pagevec_bs *pvec = &get_cpu_var_bs(lru_add_pvecs_bs);
 
 	if (pagevec_count_bs(pvec))
-		__pagevec_lru_add_bs(pvec);
+		BS_DUP();
 	pvec = &__get_cpu_var_bs(lru_add_active_pvecs_bs);
 	if (pagevec_count_bs(pvec))
-		__pagevec_lru_add_active_bs(pvec);
+		BS_DUP();
 	put_cpu_var_bs(lru_add_pvecs_bs);
 }
 
