@@ -151,10 +151,10 @@ static void __init reserve_bootmem_core_bs(bootmem_data_t_bs *bdata,
  */
 static void * __init
 __alloc_bootmem_core_bs(struct bootmem_data_bs *bdata, unsigned long size,
-			unsigned long align, unsigned long goal)
+		unsigned long align, unsigned long goal, unsigned long limit)
 {
 	unsigned long offset, remaining_size, areasize, preferred;
-	unsigned long i, start = 0, incr, eidx;
+	unsigned long i, start = 0, incr, eidx, end_pfn = bdata->node_low_pfn;
 	void *ret;
 
 	if (!size) {
@@ -163,7 +163,14 @@ __alloc_bootmem_core_bs(struct bootmem_data_bs *bdata, unsigned long size,
 	}
 	BUG_ON_BS(align & (align-1));
 
-	eidx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT_BS);
+	if (limit && bdata->node_boot_start >= limit)
+		return NULL;
+
+        limit >>= PAGE_SHIFT_BS;
+	if (limit && end_pfn > limit)
+		end_pfn = limit;
+
+	eidx = end_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
 	offset = 0;
 	if (align &&
 		(bdata->node_boot_start & (align - 1UL)) != 0)
@@ -175,11 +182,12 @@ __alloc_bootmem_core_bs(struct bootmem_data_bs *bdata, unsigned long size,
 	 * first, then we try to allocate lower pages.
 	 */
 	if (goal && (goal >= bdata->node_boot_start) &&
-		((goal >> PAGE_SHIFT_BS) < bdata->node_low_pfn)) {
+		((goal >> PAGE_SHIFT_BS) < end_pfn)) {
 		preferred = goal - bdata->node_boot_start;
 
 		if (bdata->last_success >= preferred)
-			preferred = bdata->last_success;
+			if (!limit || (limit && limit > bdata->last_success))
+				preferred = bdata->last_success;
 	} else
 		preferred = 0;
 
@@ -363,15 +371,15 @@ void __init reserve_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long physaddr,
 	reserve_bootmem_core_bs(pgdat->bdata, physaddr, size);
 }
 
-void * __init __alloc_bootmem_bs(unsigned long size, unsigned long align,
-		unsigned long goal)
+void * __init __alloc_bootmem_limit_bs(unsigned long size, unsigned long align,
+		unsigned long goal, unsigned long limit)
 {
 	pg_data_t_bs *pgdat = pgdat_list_bs;
 	void *ptr;
 
 	for_each_pgdat_bs(pgdat)
 		if ((ptr = __alloc_bootmem_core_bs(pgdat->bdata, 
-							size, align, goal)))
+						size, align, goal, limit)))
 			return (ptr);
 	/*
 	 * Whoops, we cannot satisfy the allocation request.
@@ -381,16 +389,17 @@ void * __init __alloc_bootmem_bs(unsigned long size, unsigned long align,
 	return NULL;
 }
 
-void *__init __alloc_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long size,
-		unsigned long align, unsigned long goal)
+void *__init __alloc_bootmem_node_limit_bs(pg_data_t_bs *pgdat, 
+	unsigned long size, unsigned long align, unsigned long goal,
+	unsigned long limit)
 {
 	void *ptr;
 
-	ptr = __alloc_bootmem_core_bs(pgdat->bdata, size, align, goal);
+	ptr = __alloc_bootmem_core_bs(pgdat->bdata, size, align, goal, limit);
 	if (ptr)
 		return (ptr);
 
-	return __alloc_bootmem_bs(size, align, goal);
+	return __alloc_bootmem_limit_bs(size, align, goal, limit);
 }
 
 unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat)
