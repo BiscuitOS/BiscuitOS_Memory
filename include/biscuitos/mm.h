@@ -303,5 +303,6 @@ extern int __set_page_dirty_nobuffers_bs(struct page *page);
 extern void PAGE_TO_PAGE_BS(struct page *page, struct page_bs *page_bs);
 extern void PAGE_BS_TO_PAGE(struct page *page, struct page_bs *page_bs);
 extern void show_mem_bs(void);
+static inline void setup_per_cpu_pageset_bs(void) { }
 
 #endif

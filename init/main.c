@@ -21,6 +21,7 @@
 #include "biscuitos/moduleparam.h"
 #include "asm-generated/memory.h"
 #include "asm-generated/setup.h"
+#include "asm-generated/sections.h"
 
 /*
  * Boot command-line arguments
@@ -48,8 +49,6 @@ static void __init setup_per_cpu_areas_bs(void)
 {
 	unsigned long size, i;
 	char *ptr;
-	/* Created by linker magic */
-	extern char __per_cpu_start_bs[], __per_cpu_end_bs[];
 
 	/* Copy section for each CPU (we discard the original) */
 	size = ALIGN(__per_cpu_end_bs - __per_cpu_start_bs, 
@@ -223,6 +222,7 @@ asmlinkage void __init start_kernel_bs(void)
 	vfs_caches_init_early_bs();
 	mem_init_bs();
 	kmem_cache_init_bs();
+	setup_per_cpu_pageset_bs();
 	DEBUG_CALL(module);
 	DEBUG_CALL(vmalloc);
 	DEBUG_CALL(kmap);

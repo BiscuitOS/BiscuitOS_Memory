@@ -57,10 +57,7 @@ struct node_info {
 };
 
 #define O_PFN_DOWN(x)	((x) >> PAGE_SHIFT_BS)
-#define V_PFN_DOWN(x)	O_PFN_DOWN(__pa_bs(x))
-
 #define O_PFN_UP(x)	(PAGE_ALIGN_BS(x) >> PAGE_SHIFT_BS)
-#define V_PFN_UP(x)	O_PFN_UP(__pa_bs(x))
 
 /*
  * Scan the memory info structure and pull out:
@@ -106,8 +103,9 @@ find_memend_and_nodes_bs(struct meminfo *mi, struct node_info *np)
 		/*
 		 * Get the start and end pfns for this bank
 		 */
-		start = O_PFN_UP(mi->bank[i].start);
-		end   = O_PFN_DOWN(mi->bank[i].start + mi->bank[i].size);
+		start = mi->bank[i].start >> PAGE_SHIFT_BS;
+		end   = (mi->bank[i].start + mi->bank[i].size) >> 
+							PAGE_SHIFT_BS;
 
 		if (np[node].start > start)
 			np[node].start = start;
@@ -165,7 +163,7 @@ find_bootmap_pfn_bs(int node, struct meminfo *mi, unsigned int bootmap_pages)
 {
 	unsigned int start_pfn, bank, bootmap_pfn;
 
-	start_pfn   = V_PFN_UP(_end_bs);
+	start_pfn   = O_PFN_UP(__pa_bs(_end_bs));
 	bootmap_pfn = 0;
 
 	for (bank = 0; bank < mi->nr_banks; bank++) {
@@ -174,9 +172,9 @@ find_bootmap_pfn_bs(int node, struct meminfo *mi, unsigned int bootmap_pages)
 		if (mi->bank[bank].node != node)
 			continue;
 
-		start = O_PFN_UP(mi->bank[bank].start);
-		end   = O_PFN_DOWN(mi->bank[bank].size +
-					mi->bank[bank].start);
+		start = mi->bank[bank].start >> PAGE_SHIFT_BS;
+		end   = (mi->bank[bank].size +
+			 mi->bank[bank].start) >> PAGE_SHIFT_BS;
 
 		if (end < start_pfn)
 			continue;
@@ -463,6 +461,69 @@ void __init paging_init_bs(struct meminfo *mi, struct machine_desc_bs *mdesc)
 	kmap_init_bs();
 }
 
+static inline void
+free_memmap_bs(int node, unsigned long start_pfn, unsigned long end_pfn)
+{
+	struct page_bs *start_pg, *end_pg;
+	unsigned long pg, pgend;
+
+	/*
+	 * Convert start_pfn/end_pfn to a struct page pointer.
+	 */
+	start_pg = pfn_to_page_bs(start_pfn);
+	end_pg = pfn_to_page_bs(end_pfn);
+
+	/*
+	 * Convert to physical addresses, and
+	 * round start upwards and end downwards.
+	 */
+	pg = PAGE_ALIGN_BS(__pa_bs(start_pg));
+	pgend = __pa_bs(end_pg) & PAGE_MASK_BS;
+
+	/*
+	 * If there are free pages between these,
+	 * free the section of the memmap array.
+	 */
+	if (pg < pgend)
+		free_bootmem_node_bs(NODE_DATA_BS(node), pg, pgend - pg);
+}
+
+/*
+ * The mem_map array can get very big.  Free the unused area of the memory map.
+ */
+static void __init free_unused_memmap_node_bs(int node, struct meminfo *mi)
+{
+	unsigned long bank_start, prev_bank_end = 0;
+	unsigned int i;
+
+	/*
+	 * [FIXME] This relies on each bank being in address order.  This
+	 * may not be the case, especially if the user has provided the
+	 * information on the command line.
+	 */
+	for (i = 0; i < mi->nr_banks; i++) {
+		if (mi->bank[i].size == 0 || mi->bank[i].node != node)
+			continue;
+
+		bank_start = mi->bank[i].start >> PAGE_SHIFT_BS;
+		if (bank_start < prev_bank_end) {
+			printk(KERN_ERR "MEM: unordered memory banks.  "
+				"Not freeing memmap.\n");
+			break;
+		}
+
+		/*
+		 * If we had a previous bank, and there is a space
+		 * between the current bank and the previous, free it.
+		 */
+		if (prev_bank_end && prev_bank_end != bank_start)
+			free_memmap_bs(node, prev_bank_end, bank_start);
+
+		prev_bank_end = (mi->bank[i].start +
+				 mi->bank[i].size) >> PAGE_SHIFT_BS;
+	}
+}
+
 /* FIXME: BiscuitOS buddy debug stuf */
 DEBUG_FUNC_T(buddy);
 DEBUG_FUNC_T(pcp);
@@ -483,15 +544,11 @@ void __init mem_init_bs(void)
 
 	max_mapnr_bs = virt_to_page_bs(high_memory_bs) - mem_map_bs;
 
-	/*
-	 * We may have non-contiguous memory
-	 */
-	if (meminfo_bs.nr_banks != 1)
-		create_memmap_holes_bs(&meminfo_bs);
-
 	/* this will put all unused low memory onto the freelists */
 	for_each_online_node_bs(node) {
 		pg_data_t_bs *pgdat = NODE_DATA_BS(node);
+
+		free_unused_memmap_node_bs(node, &meminfo_bs);
 
 		if (pgdat->node_spanned_pages != 0)
 			totalram_pages_bs += free_all_bootmem_node_bs(pgdat);

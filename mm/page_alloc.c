@@ -30,11 +30,13 @@
 
 nodemask_t_bs node_online_map_bs = { { [0] = 1UL } };
 
+#ifndef CONFIG_NEED_MULTIPLE_NODES
 static bootmem_data_t_bs contig_bootmem_data_bs;
 struct pglist_data_bs contig_page_data_bs = { 
 	.bdata = &contig_bootmem_data_bs 
 };
 EXPORT_SYMBOL_GPL(contig_page_data_bs);
+#endif
 struct pglist_data_bs *pgdat_list_bs;
 long nr_swap_pages_bs;
 
@@ -109,7 +111,7 @@ static void __init alloc_node_mem_map_bs(struct pglist_data_bs *pgdat)
 			map = alloc_bootmem_node_bs(pgdat, size);
 		pgdat->node_mem_map = map;
 	}
-#ifndef CONFIG_FLATMEM
+#ifdef CONFIG_FLATMEM
 	/*
 	 * With no DISCONTIG, the global mem_map is just set as node 0's
 	 */

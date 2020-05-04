@@ -29,6 +29,8 @@ void *mempool_alloc_bs(mempool_t_bs *pool, unsigned int __nocast gfp_mask);
 void mempool_destroy_bs(mempool_t_bs *pool);
 mempool_t_bs *mempool_create_bs(int min_nr, mempool_alloc_t_bs *alloc_fn,
 			mempool_free_t_bs *free_fn, void *pool_data);
+mempool_t_bs *mempool_create_node_bs(int min_nr, mempool_alloc_t_bs *alloc_fn,
+			mempool_free_t_bs *free_fn, void *pool_data, int nid);
 int mempool_resize_bs(mempool_t_bs *, int, unsigned int __nocast);
 
 #endif

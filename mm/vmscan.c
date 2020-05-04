@@ -542,10 +542,6 @@ static int kswapd_bs(void *p)
 int zone_reclaim_bs(struct zone_bs *zone, unsigned int gfp_mask, 
 							unsigned int order)
 {
-	struct scan_control_bs sc;
-	int nr_pages = 1 << order;
-	int total_reclaimed = 0;
-
 	/* The reclaim may sleep, so don't do it if sleep isn't allowed */
 	if (!(gfp_mask & __GFP_WAIT_BS))
 		return 0;

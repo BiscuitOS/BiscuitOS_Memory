@@ -27,7 +27,7 @@ void __init inode_init_early_bs(void)
 
 	inode_hashtable_bs =
 		alloc_large_system_hash_bs(
-				"Inode-cache-bs",
+				"Inode cache bs",
 				sizeof(struct hlist_head),
 				ihash_entries_bs,
 				14,
