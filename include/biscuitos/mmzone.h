@@ -5,6 +5,7 @@
 #include <linux/list.h>
 #include "biscuitos/cache.h"
 #include "asm-generated/arch.h"
+#include "asm-generated/types.h"
 
 /* Free memory management - zoned buddy allocator.  */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
@@ -41,6 +42,11 @@
 /* #define GFP_ZONETYPES        (GFP_ZONEMASK + 1) */		/* Non-loner */
 #define GFP_ZONETYPES_BS	((GFP_ZONEMASK_BS + 1) / 2 + 1)	/* Loner */
 
+#ifdef CONFIG_NUMA
+#define zone_pcp_bs(__z, __cpu) ((__z)->pageset[(__cpu)])
+#else
+#define zone_pcp_bs(__z, __cpu) (&(__z)->pageset[(__cpu)])
+#endif
 
 #define ZONE_DMA_BS		0
 #define ZONE_NORMAL_BS		1
@@ -121,7 +127,11 @@ struct zone_bs {
 	 */     
 	unsigned long		lowmem_reserve[MAX_NR_ZONES_BS];
 
-	struct per_cpu_pageset_bs pageset[NR_CPUS_BS];
+#ifdef CONFIG_NUMA
+	struct per_cpu_pageset_bs	*pageset[NR_CPUS_BS];
+#else
+	struct per_cpu_pageset_bs	pageset[NR_CPUS_BS];
+#endif
 
 	/*
 	 * free areas of different sizes
@@ -141,6 +151,14 @@ struct zone_bs {
 	unsigned long		nr_inactive;
 	unsigned long		pages_scanned;	    /* since last reclaim */
 	int			all_unreclaimable;  /* All pages pinned */
+
+	/*
+	 * Does the allocator try to reclaim pages from the zone as soon
+	 * as it fails a watermark_ok() in __alloc_pages?
+	 */
+	int			reclaim_pages;
+	/* A count of how many reclaimers are scanning this zone */
+	atomic_t		reclaim_in_progress;
 
 	/*
 	 * prev_priority holds the scanning priority for this zone.  It is
@@ -232,7 +250,9 @@ typedef struct pglist_data_bs {
 	struct zone_bs node_zones[MAX_NR_ZONES_BS];
 	struct zonelist_bs node_zonelists[GFP_ZONETYPES_BS];
 	int nr_zones;
+#ifdef CONFIG_FLAT_NODE_MEM_MAP
 	struct page_bs *node_mem_map;
+#endif
 	struct bootmem_data_bs *bdata;
 	unsigned long node_start_pfn;
 	unsigned long node_present_pages; /* total number of physical pages */
@@ -251,13 +271,54 @@ extern struct pglist_data_bs *pgdat_list_bs;
 #define NODE_DATA_BS(nid)	(&contig_page_data_bs)
 #define MAX_NODES_SHIFT_BS	1
 
+#define node_present_pages_bs(nid) (NODE_DATA_BS(nid)->node_present_pages)
+#define node_spanned_pages_bs(nid) (NODE_DATA_BS(nid)->node_spanned_pages)
+#ifdef CONFIG_FLAT_NODE_MEM_MAP
+#define pgdat_page_nr_bs(pgdat, pagenr)	((pgdat)->node_mem_map + (pagenr))
+#else
+#define pgdat_page_nr_bs(pgdat, pagenr)	pfn_to_page_bs((pgdat)->node_start_pfn + (pagenr))
+#endif
+#define nid_page_nr_bs(nid, pagenr) 	pgdat_page_nr_bs(NODE_DATA_BS(nid),(pagenr))
+
+#if BITS_PER_LONG_BS == 32 || defined(ARCH_HAS_ATOMIC_UNSIGNED)
+/*
+ * with 32 bit page->flags field, we reserve 8 bits for node/zone info.
+ * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.
+ */
+#define FLAGS_RESERVED_BS	8
+
+#elif BITS_PER_LONG_BS == 64
+/*
+ * with 64 bit flags field, there's plenty of room.
+ */
+#define FLAGS_RESERVED_BS	32
+
+#else
+
+#error BITS_PER_LONG_BS not defined
+
+#endif
+
 /* There are currently 3 zones: DMA, Normal & Highmem, thus we need 2 bits */
 #define MAX_ZONES_SHIFT_BS	2
+
+#ifdef CONFIG_NODES_SPAN_OTHER_NODES
+#define early_pfn_in_nid_bs(pfn, nid)	(early_pfn_to_nid_bs(pfn) == (nid))
+#else
+#define early_pfn_in_nid_bs(pfn, nid)	(1)
+#endif
+
+#ifndef early_pfn_valid_bs
+#define early_pfn_valid_bs(pfn)	(1)
+#endif
 
 /*
  * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc
  */
 #define zone_idx_bs(zone)	((zone - (zone)->zone_pgdat->node_zones))
+
+#define pfn_to_section_nr_bs(pfn) ((pfn) >> PFN_SECTION_SHIFT_BS)
+#define section_nr_to_pfn_bs(sec) ((sec) << PFN_SECTION_SHIFT_BS)
 
 /*
  * for_each_pgdat - helper macro to iterate over all nodes

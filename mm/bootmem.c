@@ -29,6 +29,14 @@ EXPORT_SYMBOL_GPL(max_pfn_bs);		/* This is exported so
 					 * dma_get_required_mask(), which uses
 					 * it, can be an inline function */
 
+#ifdef CONFIG_CRASH_DUMP
+/*
+ * If we have booted due to a crash, max_pfn will be a very low value. We need
+ * to know the amount of memory that the previous kernel used.
+ */
+unsigned long saved_max_pfn_bs;
+#endif
+
 /* return the number of _pages_ that will be allocated for the boot bitmap */
 unsigned long __init bootmem_bootmap_pages_bs(unsigned long pages)
 {
@@ -53,7 +61,7 @@ static unsigned long __init init_bootmem_core_bs(pg_data_t_bs *pgdat,
 	pgdat->pgdat_next = pgdat_list_bs;
 	pgdat_list_bs = pgdat;
 
-	mapsize = (mapsize + (sizeof(long) - 1UL)) & ~(sizeof(long) - 1UL);
+	mapsize = ALIGN(mapsize, sizeof(long));
 	bdata->node_bootmem_map = phys_to_virt_bs(mapstart << PAGE_SHIFT_BS);
 	bdata->node_boot_start = (start << PAGE_SHIFT_BS);
 	bdata->node_low_pfn = end;
@@ -175,7 +183,7 @@ __alloc_bootmem_core_bs(struct bootmem_data_bs *bdata, unsigned long size,
 	} else
 		preferred = 0;
 
-	preferred = ((preferred + align - 1) & ~(align - 1)) >> PAGE_SHIFT_BS;
+	preferred = ALIGN(preferred, align) >> PAGE_SHIFT;
 	preferred += offset;
 	areasize = (size+PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
 	incr = align >> PAGE_SHIFT_BS ? : 1;
@@ -217,7 +225,7 @@ found:
 	 */
 	if (align < PAGE_SIZE_BS &&
 		bdata->last_offset && bdata->last_pos+1 == start) {
-		offset = (bdata->last_offset+align-1) & ~(align-1);
+		offset = ALIGN(bdata->last_offset, align);
 		BUG_ON_BS(offset > PAGE_SIZE_BS);
 		remaining_size = PAGE_SIZE_BS - offset;
 		if (size < remaining_size) {
@@ -260,6 +268,7 @@ void __init free_bootmem_bs(unsigned long addr, unsigned long size)
 static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 {
 	struct page_bs *page;
+	unsigned long pfn;
 	bootmem_data_t_bs *bdata = pgdat->bdata;
 	unsigned long i, count, total = 0;
 	unsigned long idx;
@@ -270,7 +279,7 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 
 	count = 0;
 	/* first extant page of the node */
-	page = virt_to_page_bs(phys_to_virt_bs(bdata->node_boot_start));
+	pfn = bdata->node_boot_start >> PAGE_SHIFT_BS;
 	idx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT_BS);
 	map = bdata->node_bootmem_map;
 	/* Check physaddr is O(LOG2(BITS_PER_LONG)) page aligned */
@@ -283,6 +292,7 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 		if (gofast && v == ~0UL) {
 			int j, order;
 
+			page = pfn_to_page_bs(pfn);
 			count += BITS_PER_LONG_BS;
 			__ClearPageReserved_bs(page);
 			order = ffs(BITS_PER_LONG_BS) - 1;
@@ -298,6 +308,7 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 		} else if (v) {
 			unsigned long m;
 
+			page = pfn_to_page_bs(pfn);
 			for (m = 1; m && i < idx; m <<= 1, page++, i++) {
 				if (v & m) {
 					count++;
@@ -308,8 +319,8 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 			}
 		} else {
 			i+= BITS_PER_LONG_BS;
-			page += BITS_PER_LONG_BS;
 		}
+		pfn += BITS_PER_LONG_BS;
 	}
 	total += count;
 

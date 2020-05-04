@@ -21,12 +21,77 @@ typedef unsigned long page_flags_t_bs;
 /*
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
- * We'll have up to (MAX_NUMNODES * MAX_NR_ZONES) zones total,
- * so we use (MAX_NODES_SHIFT + MAX_ZONES_SHIFT) here to get enough bits.
  */
-#define NODEZONE_SHIFT_BS	(sizeof(page_flags_t_bs)*8 - \
-				 MAX_NODES_SHIFT_BS - MAX_ZONES_SHIFT_BS)
-#define NODEZONE_BS(node, zone)	((node << ZONES_SHIFT_BS) | zone)
+
+/*
+ * page->flags layout:
+ *
+ * There are three possibilities for how page->flags get
+ * laid out.  The first is for the normal case, without
+ * sparsemem.  The second is for sparsemem when there is
+ * plenty of space for node and section.  The last is when
+ * we have run out of space and have to fall back to an
+ * alternate (slower) way of determining the node.
+ *
+ *        No sparsemem: |       NODE     | ZONE | ... | FLAGS |
+ * with space for node: | SECTION | NODE | ZONE | ... | FLAGS |
+ *   no space for node: | SECTION |     ZONE    | ... | FLAGS |
+ */
+#ifdef CONFIG_SPARSEMEM
+#define SECTIONS_WIDTH_BS	SECTIONS_SHIFT_BS
+#else
+#define SECTIONS_WIDTH_BS	0
+#endif
+
+#define ZONES_WIDTH_BS		ZONES_SHIFT_BS
+
+#if SECTIONS_WIDTH_BS+ZONES_WIDTH_BS+NODES_SHIFT_BS <= FLAGS_RESERVED_BS
+#define NODES_WIDTH_BS		NODES_SHIFT_BS
+#else
+#define NODES_WIDTH_BS		0
+#endif
+
+/* Page flags: | [SECTION] | [NODE] | ZONE | ... | FLAGS | */
+#define SECTIONS_PGOFF_BS	((sizeof(page_flags_t_bs)*8) - \
+							SECTIONS_WIDTH_BS)
+#define NODES_PGOFF_BS		(SECTIONS_PGOFF_BS - NODES_WIDTH_BS)
+#define ZONES_PGOFF_BS		(NODES_PGOFF_BS - ZONES_WIDTH_BS)
+
+/*
+ * We are going to use the flags for the page to node mapping if its in
+ * there.  This includes the case where there is no node, so it is implicit.
+ */
+#define FLAGS_HAS_NODE_BS	(NODES_WIDTH_BS > 0 || NODES_SHIFT_BS == 0)
+
+#ifndef PFN_SECTION_SHIFT_BS
+#define PFN_SECTION_SHIFT_BS	0
+#endif
+
+/*
+ * Define the bit shifts to access each section.  For non-existant
+ * sections we define the shift as 0; that plus a 0 mask ensures
+ * the compiler will optimise away reference to them.
+ */
+#define SECTIONS_PGSHIFT_BS	(SECTIONS_PGOFF_BS * (SECTIONS_WIDTH_BS != 0))
+#define NODES_PGSHIFT_BS	(NODES_PGOFF_BS * (NODES_WIDTH_BS != 0))
+#define ZONES_PGSHIFT_BS	(ZONES_PGOFF_BS * (ZONES_WIDTH_BS != 0))
+
+/* NODE:ZONE or SECTION:ZONE is used to lookup the zone from a page. */
+#if FLAGS_HAS_NODE_BS
+#define ZONETABLE_SHIFT_BS	(NODES_SHIFT_BS + ZONES_SHIFT_BS)
+#else
+#define ZONETABLE_SHIFT_BS	(SECTIONS_SHIFT_BS + ZONES_SHIFT_BS)
+#endif
+#define ZONETABLE_PGSHIFT_BS	ZONES_PGSHIFT_BS
+
+#if SECTIONS_WIDTH_BS+NODES_WIDTH_BS+ZONES_WIDTH_BS > FLAGS_RESERVED_BS
+#error SECTIONS_WIDTH_BS+NODES_WIDTH_BS+ZONES_WIDTH_BS > FLAGS_RESERVED_BS
+#endif
+
+#define ZONES_MASK_BS		((1UL << ZONES_WIDTH_BS) - 1)
+#define NODES_MASK_BS		((1UL << NODES_WIDTH_BS) - 1)
+#define SECTIONS_MASK_BS	((1UL << SECTIONS_WIDTH_BS) - 1)
+#define ZONETABLE_MASK_BS	((1UL << ZONETABLE_SHIFT_BS) - 1)
 
 struct address_space;
 
@@ -122,10 +187,31 @@ extern struct page_bs *mem_map_bs;
 #endif
 
 static inline void set_page_zone_bs(struct page_bs *page, 
-					unsigned long nodezone_num)
+					unsigned long zone)
 {
-	page->flags &= ~(~0UL << NODEZONE_SHIFT_BS);
-	page->flags |= nodezone_num << NODEZONE_SHIFT_BS;
+	page->flags &= ~(ZONES_MASK_BS << ZONES_PGSHIFT_BS);
+	page->flags |= (zone & ZONES_MASK_BS) << ZONES_PGSHIFT_BS;
+}
+
+static inline void set_page_node_bs(struct page_bs *page, unsigned long node)
+{
+	page->flags &= ~(NODES_MASK_BS << NODES_PGSHIFT_BS);
+	page->flags |= (node & NODES_MASK_BS) << NODES_PGSHIFT_BS;
+}
+
+static inline void set_page_section_bs(struct page_bs *page, 
+						unsigned long section)
+{
+	page->flags &= ~(SECTIONS_MASK_BS << SECTIONS_PGSHIFT_BS);
+	page->flags |= (section & SECTIONS_MASK_BS) << SECTIONS_PGSHIFT_BS;
+}
+
+static inline void set_page_links_bs(struct page_bs *page, 
+	unsigned long zone, unsigned long node, unsigned long pfn)
+{
+	set_page_zone_bs(page, zone);
+	set_page_node_bs(page, node);
+	set_page_section_bs(page, pfn_to_section_nr_bs(pfn));
 }
 
 #define set_page_count_bs(p, v)		atomic_set(&(p)->_count, v - 1)
@@ -183,7 +269,8 @@ extern struct zone_bs *zone_table_bs[];
 
 static inline struct zone_bs *page_zone_bs(struct page_bs *page)
 {
-	return zone_table_bs[page->flags >> NODEZONE_SHIFT_BS];
+	return zone_table_bs[(page->flags >> ZONETABLE_PGSHIFT_BS) &
+				ZONETABLE_MASK_BS];
 }
 
 #ifndef CONFIG_DEBUG_PAGEALLOC_BS
@@ -215,5 +302,6 @@ extern void si_meminfo_bs(struct sysinfo_bs *);
 extern int __set_page_dirty_nobuffers_bs(struct page *page);
 extern void PAGE_TO_PAGE_BS(struct page *page, struct page_bs *page_bs);
 extern void PAGE_BS_TO_PAGE(struct page *page, struct page_bs *page_bs);
+extern void show_mem_bs(void);
 
 #endif

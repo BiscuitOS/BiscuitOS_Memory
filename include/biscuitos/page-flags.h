@@ -89,8 +89,8 @@ struct page_state_bs {
 	unsigned long nr_bounce;        /* pages for bounce buffers */
 };
 
-extern void __mod_page_state_bs(unsigned offset, unsigned long delta);
-extern unsigned long __read_page_state_bs(unsigned offset);
+extern void __mod_page_state_bs(unsigned long offset, unsigned long delta);
+extern unsigned long __read_page_state_bs(unsigned long offset);
 
 #define read_page_state_bs(member)					\
 	__read_page_state_bs(offsetof(struct page_state_bs, member))
@@ -206,5 +206,16 @@ extern unsigned long __read_page_state_bs(unsigned offset);
 #endif  
 #define ClearPageUptodate_bs(page)	clear_bit(PG_uptodate_Bs, \
 								&(page)->flags)
+/* Swap */
+#ifdef CONFIG_SWAP
+#define PageSwapCache_bs(page)		test_bit(PG_swapcache_bs, \
+								&(page)->flags)
+#define SetPageSwapCache_bs(page)	set_bit(PG_swapcache_bs, \
+								&(page)->flags)
+#define ClearPageSwapCache_bs(page)	clear_bit(PG_swapcache_bs, \
+								&(page)->flags)
+#else
+#define PageSwapCache(page)		0
+#endif
 
 #endif

@@ -18,6 +18,7 @@
 #include "biscuitos/swap.h"
 #include "biscuitos/mman.h"
 #include "biscuitos/init.h"
+#include "biscuitos/page-flags.h"
 #include "asm-generated/setup.h"
 #include "asm-generated/arch.h"
 #include "asm-generated/memory.h"
@@ -25,6 +26,7 @@
 #include "asm-generated/tlbflush.h"
 #include "asm-generated/string.h"
 #include "asm-generated/cacheflush.h"
+#include "asm-generated/mmzone.h"
 
 /* BiscuitOS Emulate */
 extern unsigned long _stext_bs, _etext_bs, __init_begin_bs, _text_bs;
@@ -537,4 +539,44 @@ void __init mem_init_bs(void)
 	 * This code isn't default code */
 	DEBUG_CALL(buddy);
 	DEBUG_CALL(pcp);
+}
+
+void show_mem_bs(void)
+{
+	int free = 0, total = 0, reserved = 0;
+	int shared = 0, cached = 0, slab = 0, node;
+
+	printk("Mem-info:\n");
+	show_free_areas_bs();
+	printk("Free swap:       %6ldkB\n",
+				nr_swap_pages_bs << (PAGE_SHIFT_BS-10));
+
+	for_each_online_node_bs(node) {
+		struct page_bs *page, *end;
+
+		page = NODE_MEM_MAP_BS(node);
+		end  = page + NODE_DATA_BS(node)->node_spanned_pages;
+
+		do {
+			total++;
+			if (PageReserved_bs(page))
+				reserved++;
+			else if (PageSwapCache_bs(page))
+				cached++;
+			else if (PageSlab_bs(page))
+				slab++;
+			else if (!page_count_bs(page))
+				free++;
+			else
+				shared += page_count_bs(page) - 1;
+			page++;
+		} while (page < end);
+	}
+
+	printk("%d pages of RAM\n", total);
+	printk("%d free pages\n", free);
+	printk("%d reserved pages\n", reserved);
+	printk("%d slab pages\n", slab);
+	printk("%d pages shared\n", shared);
+	printk("%d pages swap cached\n", cached);
 }

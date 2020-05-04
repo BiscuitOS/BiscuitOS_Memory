@@ -23,6 +23,6 @@
  * OR try to be smart about which process to kill. Note that we
  * don't have to be perfect here, we just have to be good.
  */
-void out_of_memory_bs(unsigned int __nocast gfp_mask)
+void out_of_memory_bs(unsigned int __nocast gfp_mask, int order)
 {
 }

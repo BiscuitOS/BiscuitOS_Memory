@@ -35,6 +35,7 @@
 #define __GFP_COMP_BS		0x4000u	/* Add compound page metadata */
 #define __GFP_ZERO_BS		0x8000u	/* Return zeroed page on success */
 #define __GFP_NOMEMALLOC_BS	0x10000u /* Don't use emergency reserves */
+#define __GFP_NORECLAIM_BS	0x20000u /* No realy zone reclaim during allocation */
 
 #define __GFP_BITS_SHIFT_BS	20     /* Room for 20 __GFP_FOO bits */
 #define __GFP_BITS_MASK_BS	((1 << __GFP_BITS_SHIFT_BS) - 1)

@@ -53,7 +53,7 @@ show_trace()
 
 mount_fs()
 {
-	insmod /lib/modules/$(uname -r)/extra/mm_bs-0.0.1.ko
+	insmod /lib/modules/$(uname -r)/extra/BiscuitOS_MMU-2.6.13.ko
 }
 
 umount_fs()

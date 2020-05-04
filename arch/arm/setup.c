@@ -74,6 +74,20 @@ static const char *proc_arch_bs[] = {
  */
 int __cpu_architecture_bs __read_mostly = CPU_ARCH_UNKNOWN_BS;
 
+static void __init add_memory_bs(unsigned long start, unsigned long size)
+{
+	/*
+	 * Ensure that start/size are alignment to page boundary.
+	 * Size is appropriately rounded down, start is rounded up.
+	 */
+	size -= start & ~PAGE_MASK_BS;
+
+	meminfo_bs.bank[meminfo_bs.nr_banks].start = PAGE_ALIGN_BS(start);
+	meminfo_bs.bank[meminfo_bs.nr_banks].size  = size & PAGE_MASK_BS;
+	meminfo_bs.bank[meminfo_bs.nr_banks].node  = PHYS_TO_NID_BS(start);
+	meminfo_bs.nr_banks += 1;
+}
+
 /*
  * Pick out the memory size. We look for mem=size@start,
  * where start and size are "size[KkMm]"
@@ -98,10 +112,7 @@ static void early_mem_bs(char **p)
 	if (**p == '@')
 		start = memparse(*p + 1, p);
 	
-	meminfo_bs.bank[meminfo_bs.nr_banks].start = start;
-	meminfo_bs.bank[meminfo_bs.nr_banks].size  = size;
-	meminfo_bs.bank[meminfo_bs.nr_banks].node  = PHYS_TO_NID_BS(start);
-	meminfo_bs.nr_banks += 1;
+	add_memory_bs(start, size);
 }
 __early_param_bs("mem_bs=", early_mem_bs);
 

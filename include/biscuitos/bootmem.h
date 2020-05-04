@@ -86,6 +86,9 @@ extern void *__init alloc_large_system_hash_bs(const char *tablename,
 #define HASHDIST_DEFAULT_BS	0
 #endif
 extern int __initdata hashdist_bs; /* Distribute hashes across NUMA nodes? */
-
+static inline void *alloc_remap_bs(int nid, unsigned long size)
+{
+	return NULL;
+}
 
 #endif

@@ -56,14 +56,16 @@ extern unsigned long totalram_pages_bs;
 extern unsigned long totalhigh_pages_bs;
 
 extern unsigned int nr_free_pages_bs(void);
-extern void out_of_memory_bs(unsigned int __nocast gfp_mask);
+extern void out_of_memory_bs(unsigned int __nocast gfp_mask, int order);
 extern void __init swap_setup_bs(void);
 struct zone_bs;
-extern int try_to_free_pages_bs(struct zone_bs **zones, 
-			unsigned int gfp_mask, unsigned int order);
+extern int try_to_free_pages_bs(struct zone_bs **zones, unsigned int gfp_mask);
 
 extern void lru_add_drain_bs(void);
 extern unsigned int nr_free_pagecache_pages_bs(void);
 extern long total_swap_pages_bs;
+extern int zone_reclaim_bs(struct zone_bs *zone, unsigned int gfp_mask, 
+							unsigned int order);
+extern long nr_swap_pages_bs;
 
 #endif
