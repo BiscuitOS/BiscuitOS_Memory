@@ -2880,6 +2880,73 @@ struct seq_operations slabinfo_op_bs = {
 	.show	= s_show_bs,
 };
 
+#ifdef CONFIG_SMP
+/**
+ * __alloc_percpu - allocate one copy of the object for every present
+ * cpu in the system, zeroing them.
+ * Objects should be dereferenced using the per_cpu_ptr macro only.
+ *
+ * @size: how many bytes of memory are required.
+ * @align: the alignment, which can't be greater than SMP_CACHE_BYTES.
+ */
+void *__alloc_percpu_bs(size_t size, size_t align)
+{
+	int i;
+	struct percpu_data_bs *pdata = 
+			kmalloc_bs(sizeof (*pdata), GFP_KERNEL_BS);
+
+	if (!pdata)
+		return NULL;
+
+	for (i = 0; i < NR_CPUS_BS; i++) {
+		if (!cpu_possible(i))
+			continue;
+		pdata->ptrs[i] = kmalloc_node_bs(size, GFP_KERNEL_BS,
+						cpu_to_node_bs(i));
+
+		if (!pdata->ptrs[i])
+			goto unwind_oom;
+		memset(pdata->ptrs[i], 0, size);
+	}
+
+	/* Catch derefs w/o wrappers */
+	return (void *) (~(unsigned long) pdata);
+
+unwind_oom:
+	while (--i >= 0) {
+		if (!cpu_possible(i))
+			continue;
+		kfree_bs(pdata->ptrs[i]);
+	}
+	kfree_bs(pdata);
+	return NULL;
+}
+EXPORT_SYMBOL(__alloc_percpu_bs);
+
+/**
+ * free_percpu - free previously allocated percpu memory
+ * @objp: pointer returned by alloc_percpu.
+ *
+ * Don't free memory not originally allocated by alloc_percpu()
+ * The complemented objp is to check for that.
+ */
+void
+free_percpu_bs(const void *objp)
+{
+	int i;
+	struct percpu_data_bs *p = 
+			(struct percpu_data_bs *) (~(unsigned long) objp);
+
+	for (i = 0; i < NR_CPUS_BS; i++) {
+		if (!cpu_possible(i))
+			continue;
+		kfree_bs(p->ptrs[i]);
+	}
+	kfree_bs(p);
+}
+EXPORT_SYMBOL_GPL(free_percpu_bs);
+#endif
+
 /*
  * kstrdup - allocate space for and copy an existing string
  *
