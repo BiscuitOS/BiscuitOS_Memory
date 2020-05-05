@@ -3024,7 +3024,7 @@ static int __init __unused cpucache_init_bs(void)
 }
 __initcall_bs(cpucache_init_bs);
 
-#ifdef CONFIG_SMP_XXX
+#ifdef CONFIG_SMP
 /**
  * __alloc_percpu - allocate one copy of the object for every present
  * cpu in the system, zeroing them.
@@ -3047,12 +3047,12 @@ void *__alloc_percpu_bs(size_t size, size_t align)
 	 * and we have no way of figuring out how to fix the array
 	 * that we have allocated then....
 	 */
-	for_each_cpu_bs(i) {
-		int node = cpu_to_node_bs(i);
+	for_each_possible_cpu(i) {
+		int node = cpu_to_node(i);
 
 		if (node_online(node))
-			pdata->ptrs[i] = 
-				kmalloc_node_bs(size, GFP_KERNEL_BS, node);
+			pdata->ptrs[i] = kmalloc_node_bs(size, 
+							GFP_KERNEL_BS, node);
 		else
 			pdata->ptrs[i] = kmalloc_bs(size, GFP_KERNEL_BS);
 
@@ -3066,7 +3066,7 @@ void *__alloc_percpu_bs(size_t size, size_t align)
 
 unwind_oom:
 	while (--i >= 0) {
-		if (!cpu_possible_bs(i))
+		if (!cpu_possible(i))
 			continue;
 		kfree_bs(pdata->ptrs[i]);
 	}
@@ -3089,11 +3089,11 @@ free_percpu_bs(const void *objp)
 	struct percpu_data_bs *p = 
 			(struct percpu_data_bs *) (~(unsigned long) objp);
 
-	/*
-	 * We allocate for all cpus so we cannot use for online cpu here.
-	 */
-	for_each_cpu_bs(i)
+	for (i = 0; i < NR_CPUS_BS; i++) {
+		if (!cpu_possible(i))
+			continue;
 		kfree_bs(p->ptrs[i]);
+	}
 	kfree_bs(p);
 }
 EXPORT_SYMBOL_GPL(free_percpu_bs);
