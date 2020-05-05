@@ -398,7 +398,7 @@ struct page_bs *kmap_atomic_to_page_bs(void *ptr)
 
 static mempool_t_bs *page_pool_bs;
 
-static void *page_pool_alloc_bs(unsigned int __nocast gfp_mask, void *data)
+static void *page_pool_alloc_bs(gfp_t_bs gfp_mask, void *data)
 {
 	unsigned int gfp = gfp_mask | (unsigned int)(long)data;
 

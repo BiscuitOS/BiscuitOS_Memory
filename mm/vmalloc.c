@@ -158,8 +158,6 @@ int map_vm_area_bs(struct vm_struct_bs *area, pgprot_t_bs prot,
 	return err;
 }
 
-#define IOREMAP_MAX_ORDER_BS	(7 + PAGE_SHIFT_BS)	/* 128 pages */
-
 struct vm_struct_bs *__get_vm_area_bs(unsigned long size, unsigned long flags,
 			unsigned long start, unsigned long end)
 {
@@ -289,7 +287,7 @@ struct vm_struct_bs *remove_vm_area_bs(void *addr)
 }
 
 void *__vmalloc_area_bs(struct vm_struct_bs *area, 
-			unsigned int __nocast gfp_mask, pgprot_t_bs prot)
+				gfp_t_bs gfp_mask, pgprot_t_bs prot)
 {
 	struct page_bs **pages;
 	unsigned int nr_pages, array_size, i;
@@ -379,7 +377,7 @@ void __vunmap_bs(void *addr, int deallocate_pages)
  *      Free the virtually contiguous memory area starting at @addr,
  *      which was created from the page array passed to vmap().
  *
- *      May not be called in interrupt context.
+ *      Must not be called in interrupt context.
  */
 void vunmap_bs(void *addr)
 {
@@ -420,15 +418,16 @@ void *vmap_bs(struct page_bs **pages, unsigned int count,
 }
 EXPORT_SYMBOL_GPL(vmap_bs);
 
-/**             
- *      vfree  -  release memory allocated by vmalloc()
+/**
+ *	vfree  -  release memory allocated by vmalloc()
  *
- *      @addr:          memory base address
- *              
- *      Free the virtually contiguous memory area starting at @addr, as
- *      obtained from vmalloc(), vmalloc_32() or __vmalloc().
+ *	@addr:		memory base address
  *
- *      May not be called in interrupt context.
+ *	Free the virtually contiguous memory area starting at @addr, as
+ *	obtained from vmalloc(), vmalloc_32() or __vmalloc(). If @addr is
+ *	NULL, no operation is performed.
+ *
+ *	Must not be called in interrupt context.
  */
 void vfree_bs(void *addr)
 {
@@ -448,7 +447,7 @@ EXPORT_SYMBOL_GPL(vfree_bs);
  *      allocator with @gfp_mask flags.  Map them into contiguous
  *      kernel virtual space, using a pagetable protection of @prot.
  */
-void *__vmalloc_bs(unsigned long size, unsigned int __nocast gfp_mask, 
+void *__vmalloc_bs(unsigned long size, gfp_t_bs gfp_mask, 
 							pgprot_t_bs prot)
 {
 	struct vm_struct_bs *area;

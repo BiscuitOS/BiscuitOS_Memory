@@ -104,8 +104,7 @@ EXPORT_SYMBOL_GPL(mempool_create_bs);
  * while this function is running. mempool_alloc() & mempool_free()
  * might be called (eg. from IRQ contexts) while this function executes.
  */
-int mempool_resize_bs(mempool_t_bs *pool, int new_min_nr,
-				unsigned int __nocast gfp_mask)
+int mempool_resize_bs(mempool_t_bs *pool, int new_min_nr, gfp_t_bs gfp_mask)
 {
 	void *element;
 	void **new_elements;
@@ -194,7 +193,7 @@ EXPORT_SYMBOL_GPL(mempool_destroy_bs);
  * *never* fails when called from process contexts. (it might
  * fail if called from an IRQ context.)
  */
-void *mempool_alloc_bs(mempool_t_bs *pool, unsigned int __nocast gfp_mask)
+void *mempool_alloc_bs(mempool_t_bs *pool, gfp_t_bs gfp_mask)
 {
 	void *element;
 	unsigned long flags;
@@ -269,7 +268,7 @@ EXPORT_SYMBOL_GPL(mempool_free_bs);
 /*
  * A commonly used alloc and free fn
  */
-void *mempool_alloc_slab_bs(unsigned int __nocast gfp_mask, void *pool_data)
+void *mempool_alloc_slab_bs(gfp_t_bs gfp_mask, void *pool_data)
 {
 	kmem_cache_t_bs *mem = (kmem_cache_t_bs *)pool_data;
 	return kmem_cache_alloc_bs(mem, gfp_mask);
