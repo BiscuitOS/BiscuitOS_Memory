@@ -1708,6 +1708,18 @@ void kfree_bs(const void *objp)
 }
 EXPORT_SYMBOL_GPL(kfree_bs);
 
+unsigned int kmem_cache_size_bs(kmem_cache_t_bs *cachep)
+{
+	return obj_reallen_bs(cachep);
+}
+EXPORT_SYMBOL_GPL(kmem_cache_size_bs);
+
+const char *kmem_cache_name_bs(kmem_cache_t_bs *cachep)
+{
+	return cachep->name;
+}
+EXPORT_SYMBOL_GPL(kmem_cache_name_bs);
+
 /**
  * kmalloc - allocate memory
  * @size: how many bytes of memory are required.
@@ -2868,3 +2880,24 @@ struct seq_operations slabinfo_op_bs = {
 	.show	= s_show_bs,
 };
 
+/*
+ * kstrdup - allocate space for and copy an existing string
+ *
+ * @s: the string to duplicate
+ * @gfp: the GFP mask used in the kmalloc() call when allocating memory
+ */
+char *kstrdup_bs(const char *s, unsigned int __nocast gfp)
+{
+	size_t len;
+	char *buf;
+
+	if (!s)
+		return NULL;
+
+	len = strlen(s) + 1;
+	buf = kmalloc_bs(len, gfp);
+	if (buf)
+		memcpy(buf, s, len);
+	return buf;
+}
+EXPORT_SYMBOL_GPL(kstrdup_bs);
