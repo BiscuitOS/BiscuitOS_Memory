@@ -2732,7 +2732,7 @@ unwind_oom:
 	kfree_bs(pdata);
 	return NULL;
 }
-EXPORT_SYMBOL(__alloc_percpu_bs);
+EXPORT_SYMBOL_GPL(__alloc_percpu_bs);
 
 /**
  * free_percpu - free previously allocated percpu memory
