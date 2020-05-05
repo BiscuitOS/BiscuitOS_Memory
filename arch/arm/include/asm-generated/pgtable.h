@@ -89,7 +89,7 @@ typedef u32 pmdval_t_bs;
  */
 #ifndef VMALLOC_START_BS
 #define VMALLOC_OFFSET_BS	(10*PAGE_SIZE_BS)
-#define VMALLOC_START_BS	(((unsigned long)high_memory_bs +	\
+#define VMALLOC_START_BS	(((unsigned long)0x94400000 +	\
 				VMALLOC_OFFSET_BS) & ~(VMALLOC_OFFSET_BS-1))
 #endif
 
@@ -497,6 +497,7 @@ static inline int pud_none_or_clear_bad_bs(pud_t_bs *pud)
 
 extern pmd_t_bs fastcall_bs *__pmd_alloc_bs(struct mm_struct_bs *mm, 
 					pud_t_bs *pud, unsigned long address);
+extern pmd_t_bs *top_pmd_bs;
 
 #define pmd_alloc_bs(mm, pud, address)					\
 ({									\

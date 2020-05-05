@@ -27,6 +27,7 @@
 #include "asm-generated/string.h"
 #include "asm-generated/cacheflush.h"
 #include "asm-generated/mmzone.h"
+#include "asm-generated/vmalloc.h"
 
 /* BiscuitOS Emulate */
 extern unsigned long _stext_bs, _etext_bs, __init_begin_bs, _text_bs;
@@ -37,6 +38,8 @@ unsigned long phys_initrd_size_bs __initdata = 0;
 unsigned long initrd_start_bs, initrd_end_bs;
 extern struct meminfo highmeminfo_bs;
 extern void __init kmap_init_bs(void);
+extern void __init build_mem_type_table_bs(void);
+extern void __init create_mapping_bs(struct map_desc *md);
 
 /*
  * empty_zero_page is a special page that is used for
@@ -59,98 +62,9 @@ struct node_info {
 #define O_PFN_DOWN(x)	((x) >> PAGE_SHIFT_BS)
 #define O_PFN_UP(x)	(PAGE_ALIGN_BS(x) >> PAGE_SHIFT_BS)
 
-/*
- * Scan the memory info structure and pull out:
- *  - the end of memory
- *  - the number of nodes
- *  - the pfn range of each node
- *  - the number of bootmem bitmap pages
- */
-static unsigned int __init
-find_memend_and_nodes_bs(struct meminfo *mi, struct node_info *np)
-{
-	unsigned int i, bootmem_pages = 0, memend_pfn = 0;
-
-	for (i = 0; i < MAX_NUMNODES_BS; i++) {
-		np[i].start = -1U;
-		np[i].end = 0;
-		np[i].bootmap_pages = 0;
-	}
-
-	for (i = 0; i < mi->nr_banks; i++) {
-		unsigned long start, end;
-		int node;
-
-		if (mi->bank[i].size == 0) {
-			/*
-			 * Mark this bank with an invalid node number
-			 */
-			mi->bank[i].node = -1;
-			continue;
-		}
-
-		node = mi->bank[i].node;
-
-		/*
-		 * Make sure we haven't exceeded the maximum number of nodes
-		 * that we have in this configuration. If we have, we're in
-		 * trouble. (maybe we ought to limit, instead of bugging?)
-		 */
-		if (node >= MAX_NUMNODES_BS)
-			BUG_BS();
-		node_set_online_bs(node);
-
-		/*
-		 * Get the start and end pfns for this bank
-		 */
-		start = mi->bank[i].start >> PAGE_SHIFT_BS;
-		end   = (mi->bank[i].start + mi->bank[i].size) >> 
-							PAGE_SHIFT_BS;
-
-		if (np[node].start > start)
-			np[node].start = start;
-
-		if (np[node].end < end)
-			np[node].end = end;
-
-		if (memend_pfn < end)
-			memend_pfn = end;
-	}
-
-#ifdef CONFIG_HIGHMEM_BS
-	/* FIXME: Default ARM doesn't support HighMem Zone,
-	 * BiscuitOS support HighMem Zone.
-	 */
-	np[0].end += O_PFN_DOWN(highmeminfo_bs.bank[0].size);
-#endif
-
-	/*
-	 * Calculate the number of pages we requires to
-	 * store the bootmem bitmap.
-	 */
-	for_each_online_node_bs(i) {
-		if (np[i].end == 0)
-			continue;
-		np[i].bootmap_pages = bootmem_bootmap_pages_bs(np[i].end -
-							np[i].start);
-		bootmem_pages += np[i].bootmap_pages;
-	}
-
-	high_memory_bs = __va_bs(memend_pfn << PAGE_SHIFT_BS);
-
-	/*
-	 * This doesn't seem to be used by the Linux memory
-	 * manager any more. If we can get rid of it, we
-	 * also get rid of some of the stuff above as well.
-	 *
-	 * Note: max_low_pfn and max_pfn reflect the number
-	 * of _pages_in the system, not the maximum PFN.
-	 */
-	max_low_pfn_bs = memend_pfn - O_PFN_DOWN(PHYS_OFFSET_BS);
-	max_pfn_bs = memend_pfn - O_PFN_DOWN(PHYS_OFFSET_BS);
-
-	return bootmem_pages;
-}
+#define for_each_nodebank_bs(iter,mi,no)			\
+	for(iter = 0; iter < mi->nr_banks; iter++)		\
+		if (mi->bank[iter].node == no)
 
 /*
  * FIXME: We really want to avoid allocating the bootmap bitmap
@@ -163,14 +77,11 @@ find_bootmap_pfn_bs(int node, struct meminfo *mi, unsigned int bootmap_pages)
 {
 	unsigned int start_pfn, bank, bootmap_pfn;
 
-	start_pfn   = O_PFN_UP(__pa_bs(_end_bs));
+	start_pfn   = PAGE_ALIGN_BS(__pa_bs(_end_bs)) >> PAGE_SHIFT_BS;
 	bootmap_pfn = 0;
 
-	for (bank = 0; bank < mi->nr_banks; bank++) {
+	for_each_nodebank_bs(bank, mi, node) {
 		unsigned long start, end;
-
-		if (mi->bank[bank].node != node)
-			continue;
 
 		start = mi->bank[bank].start >> PAGE_SHIFT_BS;
 		end   = (mi->bank[bank].size +
@@ -257,11 +168,8 @@ static inline void free_bootmem_node_bank_bs(int node, struct meminfo *mi)
 /*
  * Reserve the various regions of node 0
  */
-static __init void reserve_node_zero_bs(unsigned int bootmap_pfn, 
-						unsigned int bootmap_pages)
+static __init void reserve_node_zero_bs(pg_data_t_bs *pgdat)
 {
-	pg_data_t_bs *pgdat = NODE_DATA_BS(0);
-
 	/*
 	 * Register the kernel text and data with bootmeme.
 	 * Note that this can only be in node 0.
@@ -275,17 +183,135 @@ static __init void reserve_node_zero_bs(unsigned int bootmap_pfn,
 	 */
 	reserve_bootmem_node_bs(pgdat, __pa_bs(swapper_pg_dir_bs),
 			PTRS_PER_PGD_BS * sizeof(pgd_t_bs));
-
-	/*
-	 * And don't forget to reserve the allocator bitmap,
-	 * which will be freed later.
-	 */
-	reserve_bootmem_node_bs(pgdat, bootmap_pfn << PAGE_SHIFT_BS,
-			bootmap_pages << PAGE_SHIFT_BS);
 }
 
 /* FIXME: BiscuitOS bootmem entry */
 DEBUG_FUNC_T(bootmem);
+
+static unsigned long __init
+bootmem_init_node_bs(int node, int initrd_node, struct meminfo *mi)
+{
+	unsigned long zone_size[MAX_NR_ZONES_BS], zhole_size[MAX_NR_ZONES_BS];
+	unsigned long start_pfn, end_pfn, boot_pfn;
+	unsigned int boot_pages;
+	pg_data_t_bs *pgdat;
+	int i;
+
+	start_pfn = -1UL;
+	end_pfn = 0;
+
+	/*
+	 * Calculate the pfn range, and map the memory banks for this node.
+	 */
+	for_each_nodebank_bs(i, mi, node) {
+		unsigned long start, end;
+		struct map_desc map;
+
+		start = mi->bank[i].start >> PAGE_SHIFT_BS;
+		end = (mi->bank[i].start + mi->bank[i].size) >> PAGE_SHIFT_BS;
+
+		if (start_pfn > start)
+			start_pfn = start;
+		if (end_pfn < end)
+			end_pfn = end;
+
+		map.pfn = __phys_to_pfn_bs(mi->bank[i].start);
+		map.virtual = __phys_to_virt_bs(mi->bank[i].start);
+		map.length = mi->bank[i].size;
+		map.type = MT_MEMORY_RWX_BS;
+
+		create_mapping_bs(&map);
+	}
+
+	/*
+	 * If there is no memory in this node, ignore it.
+	 */
+	if (end_pfn == 0)
+		return end_pfn;
+
+#ifdef CONFIG_HIGHMEM_BS
+	/* FIXME: BiscuitOS Supprot HighMem Zone */
+	end_pfn += PAGE_ALIGN_BS(highmeminfo_bs.bank[0].size) >> PAGE_SHIFT_BS;
+#endif
+
+	/*
+	 * Allocate the bootmem bitmap page.
+	 */
+	boot_pages = bootmem_bootmap_pages_bs(end_pfn - start_pfn);
+	boot_pfn = find_bootmap_pfn_bs(node, mi, boot_pages);
+
+	/*
+	 * Initialise the bootmem allocator for this node, handing the
+	 * memory banks over to bootmem.
+	 */
+	node_set_online_bs(node);
+	pgdat = NODE_DATA_BS(node);
+	init_bootmem_node_bs(pgdat, boot_pfn, start_pfn, end_pfn);
+
+	for_each_nodebank_bs(i, mi, node)
+		free_bootmem_node_bs(pgdat, 
+				mi->bank[i].start, mi->bank[i].size);
+
+	/*
+	 * Reserve the bootmem bitmap for this node.
+	 */
+	reserve_bootmem_node_bs(pgdat, boot_pfn << PAGE_SHIFT,
+			     boot_pages << PAGE_SHIFT);
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	/*
+	 * If the initrd is in this node, reserve its memory.
+	 */
+	if (node == initrd_node) {
+		reserve_bootmem_node_bs(pgdat, phys_initrd_start_bs,
+				     phys_initrd_size_bs);
+		initrd_start_bs = __phys_to_virt_bs(phys_initrd_start_bs);
+		initrd_end_bs = initrd_start_bs + phys_initrd_size_bs;
+	}
+#endif
+
+	/*
+	 * Finally, reserve any node zero regions.
+	 */
+	if (node == 0)
+		reserve_node_zero_bs(pgdat);
+
+	/*
+	 * initialise the zones within this node.
+	 */
+	memset(zone_size, 0, sizeof(zone_size));
+	memset(zhole_size, 0, sizeof(zhole_size));
+
+	/*
+	 * The size of this node has already been determined.  If we need
+	 * to do anything fancy with the allocation of this memory to the
+	 * zones, now is the time to do it.
+	 */
+	zone_size[0] = end_pfn - start_pfn;
+
+	/*
+	 * For each bank in this node, calculate the size of the holes.
+	 *  holes = node_size - sum(bank_sizes_in_node)
+	 */
+	zhole_size[0] = zone_size[0];
+	for_each_nodebank_bs(i, mi, node)
+		zhole_size[0] -= mi->bank[i].size >> PAGE_SHIFT_BS;
+
+	/*
+	 * Adjust the sizes according to any special requirements for
+	 * this machine type.
+	 */
+	arch_adjust_zones_bs(node, zone_size, zhole_size);
+
+	free_area_init_node_bs(node, pgdat, zone_size, start_pfn, zhole_size);
+
+#ifdef CONFIG_HIGHMEM_BS
+	/* FIXME: BiscuitOS Supprot HighMem Zone */
+	end_pfn -= PAGE_ALIGN_BS(highmeminfo_bs.bank[0].size) >> PAGE_SHIFT_BS;
+#endif
+
+	return end_pfn;
+}
 
 /*
  * Initialise the bootmem allocator for all nodes. This is called
@@ -293,75 +319,73 @@ DEBUG_FUNC_T(bootmem);
  */
 static void __init bootmem_init_bs(struct meminfo *mi)
 {
-	struct node_info node_info[MAX_NUMNODES_BS], *np = node_info;
-	unsigned int bootmap_pages, bootmap_pfn, map_pg;
-	int node, initrd_node;
-
-	bootmap_pages = find_memend_and_nodes_bs(mi, np);
-	bootmap_pfn   = find_bootmap_pfn_bs(0, mi, bootmap_pages);
-	initrd_node   = check_initrd_bs(mi);
-
-	map_pg = bootmap_pfn;
+	unsigned long addr, memend_pfn = 0;
+	int node, initrd_node, i;
 
 	/*
-	 * Initialise the bootmem nodes.
-	 *
-	 * What we really want to do is:
-	 *
-	 *   unmap_all_regions_except_kernel();
-	 *   for_each_node_in_reverse_order(node) {
-	 *   	map_node(node);
-	 *   	allocate_bootmap_map(node);
-	 *   	init_bootmem_node(node);
-	 *   	free_bootmem_node(node);
-	 *   }
-	 *
-	 * but this is a 2.5-type change. For now, we just set
-	 * the nodes up in reverse order.
-	 *
-	 * (we could also do with rolling bootmem_init and paging_init
-	 * into one generic "memory_init" type function).
+	 * Invalidate the node number for empty or invalid memory banks
 	 */
-	np += num_online_nodes_bs() - 1;
-	for (node = num_online_nodes_bs() - 1; node >= 0; node--, np--) {
-		/*
-		 * If there are no pages in this node, ignore it.
-		 * Note that node 0 must always have some pages.
-		 */
-		if (np->end == 0 || !node_online_bs(node)) {
-			if (node == 0)
-				BUG_BS();
-			continue;
-		}
+	for (i = 0; i < mi->nr_banks; i++)
+		if (mi->bank[i].size == 0 || mi->bank[i].node >= 
+						MAX_NUMNODES_BS)
+			mi->bank[i].node = -1;
+
+	memcpy(&meminfo_bs, mi, sizeof(meminfo_bs));
+
+	/*
+	 * Clear out all the kernel space mappings, except for the first
+	 * memory bank, up to the end of the vmalloc region.
+	 */
+	for (addr = __phys_to_virt_bs(mi->bank[0].start + mi->bank[0].size);
+	     addr < VMALLOC_END_BS; addr += PGDIR_SIZE_BS)
+		pmd_clear_bs(pmd_off_k_bs(addr));
+
+	/*
+	 * Locate which node contains the ramdisk image, if any.
+	 */
+	initrd_node = check_initrd_bs(mi);
+
+	/*
+	 * Run through each node initialising the bootmem allocator.
+	 */
+	for_each_node_bs(node) {
+		unsigned long end_pfn;
+
+		end_pfn = bootmem_init_node_bs(node, initrd_node, mi);
 
 		/*
-		 * Initialise the bootmem allocator.
+		 * Remember the highest memory PFN.
 		 */
-		init_bootmem_node_bs(NODE_DATA_BS(node), map_pg,
-							np->start, np->end);
-		free_bootmem_node_bank_bs(node, mi);
-		map_pg += np->bootmap_pages;
-
-		/*
-		 * If this is node 0, we need to reserve some areas ASAP -
-		 * we may use bootmem on node 0 to setup the other nodes.
-		 */
-		if (node == 0)
-			reserve_node_zero_bs(bootmap_pfn, bootmap_pages);
+		if (end_pfn > memend_pfn)
+			memend_pfn = end_pfn;
 	}
 
-	if (phys_initrd_size_bs && initrd_node >= 0) {
-		reserve_bootmem_node_bs(NODE_DATA_BS(initrd_node),
-				phys_initrd_start_bs, phys_initrd_size_bs);
-		initrd_start_bs = __phys_to_virt_bs(phys_initrd_start_bs);
-		initrd_end_bs = initrd_start_bs + phys_initrd_size_bs;
-	}
+	high_memory_bs = __va_bs(memend_pfn << PAGE_SHIFT_BS);
 
-	BUG_ON_BS(map_pg != bootmap_pfn + bootmap_pages);
+	/*
+	 * This doesn't seem to be used by the Linux memory manager any
+	 * more, but is used by ll_rw_block.  If we can get rid of it, we
+	 * also get rid of some of the stuff above as well.
+	 *
+	 * Note: max_low_pfn and max_pfn reflect the number of _pages_ in
+	 * the system, not the maximum PFN.
+	 */
+	max_pfn_bs = max_low_pfn_bs = memend_pfn - PHYS_PFN_OFFSET_BS;
 
 	/* FIXME: bootmem_initcall entry, used to debug bootmem,
 	 * This code isn't default code */
 	DEBUG_CALL(bootmem);
+}
+
+/*
+ * Set up device the mappings.  Since we clear out the page tables for all
+ * mappings above VMALLOC_END, we will remove any debug device mappings.
+ * This means you have to be careful how you debug this function, or any
+ * called function.  This means you can't use any function or debugging
+ * method which may touch any device, otherwise the kernel _will_ crash.
+ */
+static void __init devicemaps_init_bs(struct machine_desc_bs *mdesc)
+{
 }
 
 /*
@@ -371,84 +395,17 @@ static void __init bootmem_init_bs(struct meminfo *mi)
 void __init paging_init_bs(struct meminfo *mi, struct machine_desc_bs *mdesc)
 {
 	void *zero_page;
-	int node;
 
+	build_mem_type_table_bs();
 	bootmem_init_bs(mi);
+	devicemaps_init_bs(mdesc);
 
-	memcpy(&meminfo_bs, mi, sizeof(meminfo_bs));
+	top_pmd_bs = pmd_off_k_bs(0x96400000);
 
 	/*
-	 * allocate the zero page. Note that we count on this going ok.
+	 * allocate the zero page.  Note that we count on this going ok.
 	 */
 	zero_page = alloc_bootmem_low_pages_bs(PAGE_SIZE_BS);
-
-	/*
-	 * initialise the page tables.
-	 */
-	memtable_init_bs(mi);
-	if (mdesc->map_io)
-		mdesc->map_io();
-
-	flush_tlb_all_bs();
-
-	/*
-	 * initialize the zones within each node
-	 */
-	for_each_online_node_bs(node) {
-		unsigned long zone_size[MAX_NR_ZONES_BS];
-		unsigned long zhole_size[MAX_NR_ZONES_BS];
-		struct bootmem_data_bs *bdata;
-		pg_data_t_bs *pgdat;
-		int i;
-
-		/*
-		 * Initialise the zone size information
-		 */
-		for (i = 0; i < MAX_NR_ZONES_BS; i++) {
-			zone_size[i] = 0;
-			zhole_size[i] = 0;
-		}
-
-		pgdat = NODE_DATA_BS(node);
-		bdata = pgdat->bdata;
-
-		/*
-		 * The size of this node has already been determined.
-		 * If we need to do anything fancy with the allocation
-		 * of this memory to the zones, now is the time to do
-		 * it.
-		 */
-		zone_size[0] = bdata->node_low_pfn -
-				(bdata->node_boot_start >> PAGE_SHIFT_BS);
-
-		/*
-		 * If this zone has zero size, skip it.
-		 */
-		if (!zone_size[0])
-			continue;
-
-		/*
-		 * For each bank in this node, calculate the size of the
-		 * holes.  holes = node_size - sum(bank_sizes_in_node)
-		 */
-		zhole_size[0] = zone_size[0];
-		for (i = 0; i < mi->nr_banks; i++) {
-			if (mi->bank[i].node != node)
-				continue;
-
-			zhole_size[0] -= mi->bank[i].size >> PAGE_SHIFT_BS;
-		}
-
-		/*
-		 * Adjust the sizes according to any special
-		 * requirements for this machine type.
-		 */
-		arch_adjust_zones_bs(node, zone_size, zhole_size);
-
-		free_area_init_node_bs(node, pgdat, zone_size,
-			bdata->node_boot_start >> PAGE_SHIFT_BS, zhole_size);
-	}
-
 	/*
 	 * finish off the bad pages once the mem_map is initialized
 	 */
@@ -501,10 +458,7 @@ static void __init free_unused_memmap_node_bs(int node, struct meminfo *mi)
 	 * may not be the case, especially if the user has provided the
 	 * information on the command line.
 	 */
-	for (i = 0; i < mi->nr_banks; i++) {
-		if (mi->bank[i].size == 0 || mi->bank[i].node != node)
-			continue;
-
+	for_each_nodebank_bs(i, mi, node) {
 		bank_start = mi->bank[i].start >> PAGE_SHIFT_BS;
 		if (bank_start < prev_bank_end) {
 			printk(KERN_ERR "MEM: unordered memory banks.  "

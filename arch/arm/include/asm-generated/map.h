@@ -3,7 +3,7 @@
 
 struct map_desc {
 	unsigned long virtual;
-	unsigned long physical;
+	unsigned long pfn;
 	unsigned long length;
 	unsigned int type;
 };
@@ -34,6 +34,9 @@ enum {
 	MT_MEMORY_RW_SO_BS,
 	MT_MEMORY_DMA_READY_BS,
 };
+
+#define __phys_to_pfn_bs(paddr)		((paddr) >> PAGE_SHIFT_BS)
+#define __pfn_to_phys_bs(pfn)		((pfn) << PAGE_SHIFT_BS)
 
 extern void memtable_init_bs(struct meminfo *);
 extern void __init create_memmap_holes_bs(struct meminfo *mi);

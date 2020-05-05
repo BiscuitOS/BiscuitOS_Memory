@@ -2,6 +2,7 @@
 #define _BISCUITOS_ARM_HIGHMEM_H
 
 #include "asm-generated/fixmap.h"
+#include "asm-generated/vmalloc.h"
 
 /*
  * Right now we initialize only a single pte table. It can be extended
@@ -25,9 +26,7 @@
  * VMALLOC_START
  * high_memory
  */
-extern u32 BiscuitOS_vmalloc_size;
-#define PKMAP_BASE_BS		((VMALLOC_OFFSET_BS + VMALLOC_START_BS + \
-				(unsigned long)BiscuitOS_vmalloc_size + \
+#define PKMAP_BASE_BS		((VMALLOC_OFFSET_BS + VMALLOC_END_BS + \
 				PMD_SIZE_BS - 1) & PMD_MASK_BS)
 #define LAST_PKMAP_MASK_BS	(LAST_PKMAP_BS-1)
 #define PKMAP_NR_BS(virt)	((virt-PKMAP_BASE_BS) >> PAGE_SHIFT_BS)

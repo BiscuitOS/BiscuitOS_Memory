@@ -3,10 +3,12 @@
 
 #include <linux/bitmap.h>
 #include "asm-generated/arch.h"
+#include "asm-generated/types.h"
 
 typedef struct { DECLARE_BITMAP(bits, MAX_NUMNODES_BS); } nodemask_t_bs;
 
 extern nodemask_t_bs node_online_map_bs;
+extern nodemask_t_bs node_possible_map_bs;
 
 /* FIXME: better would be to fix all architectures to never return
 	> MAX_NUMNODES_BS, then the silly min_ts could be dropped. */
@@ -70,5 +72,26 @@ static inline void __nodes_clear_bs(nodemask_t_bs *dstp, int nbits)
 		set_bit((node), node_online_map_bs.bits)
 #define for_each_online_node_bs(node)				\
 		for_each_node_mask_bs((node), node_online_map_bs)
+#define for_each_node_bs(node)					\
+		for_each_node_mask_bs((node), node_possible_map_bs)
+
+#define NODE_MASK_LAST_WORD_BS BITMAP_LAST_WORD_MASK(MAX_NUMNODES_BS)
+
+#if MAX_NUMNODES_BS <= BITS_PER_LONG_BS
+
+#define NODE_MASK_ALL_BS						\
+((nodemask_t_bs) { {							\
+	[BITS_TO_LONGS(MAX_NUMNODES_BS)-1] = NODE_MASK_LAST_WORD_BS	\
+}})
+
+#else
+
+#define NODE_MASK_ALL_BS						\
+((nodemask_t_bs) { {							\
+        [0 ... BITS_TO_LONGS(MAX_NUMNODES_BS)-2] = ~0UL,\
+        [BITS_TO_LONGS(MAX_NUMNODES_BS)-1] = NODE_MASK_LAST_WORD_BS	\
+} })
+
+#endif
 
 #endif

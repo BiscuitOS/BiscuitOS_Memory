@@ -3,13 +3,23 @@
 
 #include <asm-generated/page.h>
 
+/*
+ * Allow for constants defined here to be used from assembly code
+ * by prepending the UL suffix only with actual C code compilation.
+ */
+#ifndef __ASSEMBLY__
+#define UL_BS(x)	(x##UL)
+#else
+#define UL_BS(x)	(x)
+#endif
+
 #ifndef TASK_SIZE_BS
 /*
  * TASK_SIZE_BS - the maximum size of a user space task.
  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
  */
-#define TASK_SIZE_BS		(0x7f000000UL)
-#define TASK_UNMAPPED_BASE_BS	(0x40000000UL)
+#define TASK_SIZE_BS		UL_BS(0x7f000000)
+#define TASK_UNMAPPED_BASE_BS	UL_BS(0x40000000)
 #endif
 
 /*
@@ -99,6 +109,7 @@ static inline void *phys_to_virt_bs(unsigned long x)
  */
 #define __pa_bs(x)	__virt_to_phys_bs((unsigned long)(x))
 #define __va_bs(x)	((void *)__phys_to_virt_bs((unsigned long)(x)))
+#define pfn_to_kaddr_bs(pfn)	__va_bs((pfn) << PAGE_SHIFT_BS)
 
 #define PHYS_RELATIVE(v_data, v_text)	((v_data) - (v_text))
 

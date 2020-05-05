@@ -249,7 +249,7 @@ void __init init_default_cache_policy_bs(unsigned long pmd)
 /*
  * Adjust the PMD section entries according to the CPU in use.
  */
-static void __init build_mem_type_table_bs(void)
+void __init build_mem_type_table_bs(void)
 {
 	struct cachepolicy *cp;
 	unsigned int cr = get_cr_bs();
@@ -530,13 +530,13 @@ static void __init __create_mapping_bs(struct mm_struct_bs *mm,
 	type = &mem_types_bs[md->type];
 
 	addr = md->virtual & PAGE_MASK_BS;
-	phys = md->physical;
+	phys = md->pfn << PAGE_SHIFT_BS;
 	length = PAGE_ALIGN_BS(md->length + (md->virtual & ~PAGE_MASK_BS));
 
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK_BS)) {
 		printk("BUG: map for %#llx at %#lx can not be mapped "
 			"using pages, ignoring.\n", 
-			(long long)(md->physical), addr);
+			(long long)(md->pfn) << PAGE_SHIFT_BS, addr);
 		return;
 	}
 
@@ -561,53 +561,17 @@ static void __init __create_mapping_bs(struct mm_struct_bs *mm,
  * offsets, and we take full advantage of sections and
  * supersections.
  */
-static void __init create_mapping_bs(struct map_desc *md)
+void __init create_mapping_bs(struct map_desc *md)
 {
 	if (md->virtual != vectors_base_bs() && md->virtual < TASK_SIZE_BS) {
 		printk("BUG: not creating mapping for %#llx at %#lx in "
 				"user region\n", 
-			(long long)((u64)md->physical), md->virtual);
+			(long long)((u64)md->pfn) << PAGE_SHIFT_BS, 
+			md->virtual);
 		return;
 	}
 
 	__create_mapping_bs(&init_mm_bs, md, early_alloc_bs, false);
-}
-
-/*
- * Setup initial mappings. We use the page we allocated for zero page to
- * hold the mappings, which will get overwritten by the vectors in
- * traps_init(). The mappings must be in virtual address order.
- */
-void __init memtable_init_bs(struct meminfo *mi)
-{
-	struct map_desc map;
-	int i;
-
-	build_mem_type_table_bs();
-
-	for (i = 0; i < mi->nr_banks; i++) {
-		phys_addr_t start, end;
-		if (mi->bank[i].size == 0)
-			continue;
-
-		start = mi->bank[i].start;
-		end   = start + mi->bank[i].size;
-
-		if (start >= end)
-			break;
-
-		map.physical = start;
-		map.virtual  = __phys_to_virt_bs(start);
-		map.length   = mi->bank[i].size;
-		map.type     = MT_MEMORY_RWX_BS;
-
-		create_mapping_bs(&map);
-	}
-
-	flush_cache_all_bs();
-	flush_tlb_all_bs();
-
-	top_pmd_bs = pmd_off_k_bs(0xffff0000);
 }
 
 void arch_free_page_bs(struct page_bs *page, int order)

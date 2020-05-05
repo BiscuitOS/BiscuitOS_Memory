@@ -32,6 +32,9 @@
 #include "asm-generated/smp_plat.h"
 
 nodemask_t_bs node_online_map_bs __read_mostly = { { [0] = 1UL } };
+EXPORT_SYMBOL_GPL(node_online_map_bs);
+nodemask_t_bs node_possible_map_bs __read_mostly = NODE_MASK_ALL_BS;
+EXPORT_SYMBOL_GPL(node_possible_map_bs);
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 static bootmem_data_t_bs contig_bootmem_data_bs;
