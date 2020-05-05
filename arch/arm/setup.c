@@ -9,6 +9,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/cpumask.h>
 
 #include "biscuitos/init.h"
 #include "biscuitos/kernel.h"
@@ -29,6 +30,7 @@
 
 extern void paging_init_bs(struct meminfo *, struct machine_desc_bs *desc);
 extern void __init init_default_cache_policy_bs(unsigned long pmd);
+cpumask_t cpu_online_map_bs;
 
 /*
  * These functions re-use the assembly code in head.S, which

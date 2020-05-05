@@ -15,6 +15,9 @@
  *  kernel subsystems and hints as to where to find out what things do.
  */
 
+#include <linux/kernel.h>
+#include <linux/init.h>
+
 /**
  * oom_kill - kill the "best" process when we run out of memory
  *
@@ -26,3 +29,11 @@
 void out_of_memory_bs(unsigned int __nocast gfp_mask, int order)
 {
 }
+
+int tainted_bs;
+
+void add_taint_bs(unsigned flag)
+{
+	tainted_bs |= flag;
+}
+EXPORT_SYMBOL_GPL(add_taint_bs);

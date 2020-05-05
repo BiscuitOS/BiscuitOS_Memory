@@ -36,6 +36,7 @@
 #define __GFP_ZERO_BS		0x8000u	/* Return zeroed page on success */
 #define __GFP_NOMEMALLOC_BS	0x10000u /* Don't use emergency reserves */
 #define __GFP_NORECLAIM_BS	0x20000u /* No realy zone reclaim during allocation */
+#define __GFP_HARDWALL_BS	0x40000u /* Enforce hardwall cpuset memory allocs */
 
 #define __GFP_BITS_SHIFT_BS	20     /* Room for 20 __GFP_FOO bits */
 #define __GFP_BITS_MASK_BS	((1 << __GFP_BITS_SHIFT_BS) - 1)
@@ -47,15 +48,17 @@
 				 __GFP_NOWARN_BS | __GFP_REPEAT_BS | \
 				 __GFP_NOFAIL_BS | __GFP_NORETRY_BS | \
 				 __GFP_NO_GROW_BS | __GFP_COMP_BS | \
-				 __GFP_NOMEMALLOC_BS)
+				 __GFP_NOMEMALLOC_BS | __GFP_NORECLAIM_BS | \
+				__GFP_HARDWALL_BS)
 
 #define GFP_ATOMIC_BS		(__GFP_HIGH_BS)
 #define GFP_NOIO_BS		(__GFP_WAIT_BS)
 #define GFP_NOFS_BS		(__GFP_WAIT_BS | __GFP_IO_BS)
 #define GFP_KERNEL_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
-#define GFP_USER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS)
+#define GFP_USER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS | \
+						__GFP_HARDWALL_BS)
 #define GFP_HIGHUSER_BS		(__GFP_WAIT_BS | __GFP_IO_BS | __GFP_FS_BS | \
-						 __GFP_HIGHMEM_BS)
+					__GFP_HIGHMEM_BS | __GFP_HARDWALL_BS)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */
@@ -71,10 +74,10 @@ extern void FASTCALL_BS(free_pages_bs(unsigned long addr, unsigned int order));
 extern void arch_free_page_bs(struct page_bs *page, int order);
 
 extern struct page_bs *
-FASTCALL_BS(__alloc_pages_bs(unsigned int, unsigned int, struct zonelist_bs *));
+FASTCALL_BS(__alloc_pages_bs(gfp_t, unsigned int, struct zonelist_bs *));
 
 static inline struct page_bs *alloc_pages_node_bs(int nid,
-			unsigned int __nocast gfp_mask, unsigned int order)
+			gfp_t __nocast gfp_mask, unsigned int order)
 {
 	if (unlikely(order >= MAX_ORDER_BS))
 		return NULL;
@@ -89,9 +92,9 @@ static inline struct page_bs *alloc_pages_node_bs(int nid,
 #define alloc_page_bs(gfp_mask)	alloc_pages_bs(gfp_mask, 0)
 
 extern unsigned long
-FASTCALL_BS(__get_free_pages_bs(unsigned int __nocast gfp_mask, unsigned int order));
+FASTCALL_BS(__get_free_pages_bs(gfp_t __nocast gfp_mask, unsigned int order));
 extern unsigned long
-FASTCALL_BS(get_zeroed_page_bs(unsigned int __nocast gfp_mask));
+FASTCALL_BS(get_zeroed_page_bs(gfp_t __nocast gfp_mask));
 
 #define __get_free_page_bs(gfp_mask)				\
 		__get_free_pages_bs((gfp_mask), 0)

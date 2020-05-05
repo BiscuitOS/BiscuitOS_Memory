@@ -5,6 +5,7 @@ typedef struct kmem_cache_s_bs kmem_cache_t_bs;
 
 #include <linux/compiler.h>
 #include "biscuitos/gfp.h"
+#include "biscuitos/types.h"
 
 /* flags for kmem_cache_alloc() */
 #define SLAB_NOFS_BS		GFP_NOFS_BS
@@ -50,11 +51,11 @@ struct cache_sizes_bs {
 
 extern void __init kmem_cache_init_bs(void);
 
-void *kmem_cache_alloc_bs(kmem_cache_t_bs *, unsigned int __nocast);
+void *kmem_cache_alloc_bs(kmem_cache_t_bs *, gfp_t_bs);
 void kmem_cache_free_bs(kmem_cache_t_bs *cachep, void *objp);
-kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, int gfpflags);
+kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, gfp_t_bs gfpflags);
 extern struct cache_sizes_bs malloc_sizes_bs[];
-extern void *__kmalloc_bs(size_t, unsigned int __nocast);
+extern void *__kmalloc_bs(size_t, gfp_t_bs);
 void kfree_bs(const void *objp);
 kmem_cache_t_bs *
 kmem_cache_create_bs(const char *name, size_t size, size_t align,
@@ -63,8 +64,22 @@ kmem_cache_create_bs(const char *name, size_t size, size_t align,
 		void (*dtor)(void *, kmem_cache_t_bs *, unsigned long));
 extern int kmem_cache_destroy_bs(kmem_cache_t_bs *cachep);
 extern int kmem_cache_shrink_bs(kmem_cache_t_bs *cachep);
+extern void *kzalloc_bs(size_t, gfp_t);
 
-static inline void *kmalloc_bs(size_t size, unsigned int __nocast flags)
+/**
+ * kcalloc - allocate memory for an array. The memory is set to zero.
+ * @n: number of elements.
+ * @size: element size.
+ * @flags: the type of memory to allocate.
+ */
+static inline void *kcalloc_bs(size_t n, size_t size, gfp_t flags)
+{
+	if (n != 0 && size > INT_MAX / n)
+		return NULL;
+	return kzalloc_bs(n * size, flags);
+}
+
+static inline void *kmalloc_bs(size_t size, gfp_t_bs flags)
 {
 	if (__builtin_constant_p(size)) {
 		int i = 0;
@@ -83,7 +98,7 @@ found:
 	return __kmalloc_bs(size, flags);
 }
 
-static inline void *kmalloc_node_bs(size_t size, int flags, int node)
+static inline void *kmalloc_node_bs(size_t size, gfp_t_bs flags, int node)
 {
 	return kmalloc_bs(size, flags);
 }

@@ -32,6 +32,13 @@ struct sysinfo_bs {
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
 
+#define TAINT_PROPRIETARY_MODULE_BS	(1<<0)
+#define TAINT_FORCED_MODULE_BS		(1<<1)
+#define TAINT_UNSAFE_SMP_BS		(1<<2)
+#define TAINT_FORCED_RMMOD_BS		(1<<3)
+#define TAINT_MACHINE_CHECK_BS		(1<<4)
+#define TAINT_BAD_PAGE_BS		(1<<5)
+
 //#define BS_DUP()  printk("Expand..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
 #define BS_DUP()
 #define BS_DONE() printk("Done..[%s-%s-%d]\n", __FILE__, __func__, __LINE__)
@@ -55,5 +62,7 @@ struct sysinfo_bs {
 	if (BiscuitOS_debug)				\
 		printk(__VA_ARGS__);			\
 })
+
+extern void add_taint_bs(unsigned flag);
 
 #endif

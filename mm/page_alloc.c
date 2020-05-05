@@ -11,6 +11,7 @@
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/seq_file.h>
+#include <linux/cpumask.h>
 #include "biscuitos/kernel.h"
 #include "biscuitos/nodemask.h"
 #include "biscuitos/mmzone.h"
@@ -26,9 +27,11 @@
 #include "biscuitos/highmem.h"
 #include "biscuitos/swap.h"
 #include "biscuitos/pagevec.h"
+#include "biscuitos/types.h"
 #include "asm-generated/percpu.h"
+#include "asm-generated/smp_plat.h"
 
-nodemask_t_bs node_online_map_bs = { { [0] = 1UL } };
+nodemask_t_bs node_online_map_bs __read_mostly = { { [0] = 1UL } };
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 static bootmem_data_t_bs contig_bootmem_data_bs;
@@ -37,7 +40,7 @@ struct pglist_data_bs contig_page_data_bs = {
 };
 EXPORT_SYMBOL_GPL(contig_page_data_bs);
 #endif
-struct pglist_data_bs *pgdat_list_bs;
+struct pglist_data_bs *pgdat_list_bs __read_mostly;
 long nr_swap_pages_bs;
 
 EXPORT_SYMBOL_GPL(nr_swap_pages_bs);
@@ -46,7 +49,7 @@ EXPORT_SYMBOL_GPL(nr_swap_pages_bs);
  * Used by page_zone() to look up the address of the struct zone whose
  * id is encoded in the upper bits of page->flags
  */
-struct zone_bs *zone_table_bs[1 << ZONETABLE_SHIFT_BS];
+struct zone_bs *zone_table_bs[1 << ZONETABLE_SHIFT_BS] __read_mostly;
 EXPORT_SYMBOL_GPL(zone_table_bs);
 
 /*
@@ -68,8 +71,8 @@ int sysctl_lowmem_reserve_ratio_bs[MAX_NR_ZONES_BS-1] = { 256, 32 };
 
 unsigned long __initdata nr_kernel_pages_bs;
 unsigned long __initdata nr_all_pages_bs;
-unsigned long totalram_pages_bs;
-unsigned long totalhigh_pages_bs;
+unsigned long totalram_pages_bs __read_mostly;
+unsigned long totalhigh_pages_bs __read_mostly;
 
 static char *zone_names_bs[MAX_NR_ZONES_BS] = { "DMA", "Normal", "HighMem" };
 int min_free_kbytes_bs = 1024;
@@ -130,16 +133,18 @@ static void show_node_bs(struct zone *zone)
 #define show_node_bs(zone)	do { } while (0)
 #endif
 
-void __get_page_state_bs(struct page_state_bs *ret, int nr);
+void __get_page_state_bs(struct page_state_bs *ret, int nr, 
+						cpumask_t *cpumask);
 
 void get_page_state_bs(struct page_state_bs *ret)
 {
 	int nr;
+	cpumask_t mask = CPU_MASK_ALL;
 
 	nr = offsetof(struct page_state_bs, GET_PAGE_STATE_LAST_BS);
 	nr /= sizeof(unsigned long);
 
-	__get_page_state_bs(ret, nr + 1);
+	__get_page_state_bs(ret, nr + 1, &mask);
 }
 
 void __get_zone_counts_bs(unsigned long *active, unsigned long *inactive,
@@ -416,6 +421,8 @@ inline void setup_pageset_bs(struct per_cpu_pageset_bs *p, unsigned long batch)
 {
 	struct per_cpu_pages_bs *pcp;
 
+	memset(p, 0, sizeof(*p));
+
 	pcp = &p->pcp[0];		/* hot */
 	pcp->count = 0;
 	pcp->low = 2 * batch;
@@ -521,7 +528,7 @@ static void __init free_area_init_core_bs(struct pglist_data_bs *pgdat,
 		zone->nr_scan_active = 0;
 		zone->nr_scan_inactive = 0;
 		zone->nr_inactive = 0;
-		atomic_set(&zone->reclaim_in_progress, -1);
+		atomic_set(&zone->reclaim_in_progress, 0);
 		if (!size)
 			continue;
 
@@ -736,6 +743,7 @@ static void bad_page_bs(const char *function, struct page_bs *page)
 	set_page_count_bs(page, 0);
 	reset_page_mapcount_bs(page);
 	page->mapping = NULL;
+	add_taint_bs(TAINT_BAD_PAGE_BS);
 }
 
 static inline void free_pages_check_bs(const char *function,
@@ -755,7 +763,7 @@ static inline void free_pages_check_bs(const char *function,
 			1 << PG_writeback_bs	)))
 		bad_page_bs(function, page);
 	if (PageDirty_bs(page))
-		ClearPageDirty_bs(page);
+		__ClearPageDirty_bs(page);
 }
 
 #ifndef CONFIG_HUGETLB_PAGE_BS
@@ -903,7 +911,7 @@ static inline void __free_pages_bulk_bs(struct page_bs *page,
 /*
  * Frees a list of pages. 
  * Assumes all pages on list are in same zone, and of same order.
- * count is the number of pages to free, or 0 for all on the list.
+ * count is the number of pages to free.
  *
  * If the zone was previously in an "all pages pinned" state then look to
  * see if this freeing clears that state.
@@ -1153,7 +1161,7 @@ static void prep_new_page_bs(struct page_bs *page, int order)
 }
 
 static inline void prep_zero_page_bs(struct page_bs *page, int order,
-			unsigned int __nocast gfp_flags)
+			gfp_t_bs __nocast gfp_flags)
 {
 	int i;
 
@@ -1170,7 +1178,7 @@ static inline void prep_zero_page_bs(struct page_bs *page, int order,
  */
 static struct page_bs *
 buffered_rmqueue_bs(struct zone_bs *zone, int order, 
-				unsigned int __nocast gfp_flags)
+				gfp_t_bs __nocast gfp_flags)
 {
 	unsigned long flags;
 	struct page_bs *page = NULL;
@@ -1219,7 +1227,7 @@ static void zone_statistics_bs(struct zonelist_bs *zonelist,
 }
 
 static inline int
-should_reclaim_zone_bs(struct zone_bs *z, unsigned int gfp_mask)
+should_reclaim_zone_bs(struct zone_bs *z, gfp_t_bs gfp_mask)
 {
 	if (!z->reclaim_pages)
 		return 0;
@@ -1232,7 +1240,7 @@ should_reclaim_zone_bs(struct zone_bs *z, unsigned int gfp_mask)
  * This is the 'heart' of the zoned buddy allocator.
  */
 struct page_bs *fastcall_bs
-__alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
+__alloc_pages_bs(gfp_t_bs __nocast gfp_mask, unsigned int order,
 		struct zonelist_bs *zonelist)
 {
 	const int wait = gfp_mask & __GFP_WAIT_BS;
@@ -1265,11 +1273,14 @@ __alloc_pages_bs(unsigned int __nocast gfp_mask, unsigned int order,
 	classzone_idx = zone_idx_bs(zones[0]);
 
 restart:
-	/* Go through the zonelist once, looking for a zone with enough free */
+	/*
+	 * Go through the zonelist once, looking for a zone with enough free.
+	 * See also cpuset_zone_allowed() comment in kernel/cpuset.c.
+	 */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		int do_reclaim = should_reclaim_zone_bs(z, gfp_mask);
 
-		if (wait && !cpuset_zone_allowed_bs(z))
+		if (wait && !cpuset_zone_allowed_bs(z, __GFP_HARDWALL_BS))
 			continue;
 
 		/*
@@ -1304,6 +1315,7 @@ zone_reclaim_retry:
 	 *
 	 * This is the last chance, in general, before the goto nopage.
 	 * Ignore cpuset if GFP_ATOMIC (!wait) rather than fail alloc.
+	 * See also cpuset_zone_allowed() comment in kernel/cpuset.c.
 	 */
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		if (!zone_watermark_ok_bs(z, order, z->pages_min,
@@ -1311,7 +1323,7 @@ zone_reclaim_retry:
 					gfp_mask & __GFP_HIGH_BS))
 			continue;
 
-		if (wait && !cpuset_zone_allowed_bs(z))
+		if (wait && !cpuset_zone_allowed_bs(z, gfp_mask))
 			continue;
 
 		page = buffered_rmqueue_bs(z, order, gfp_mask);
@@ -1327,7 +1339,7 @@ zone_reclaim_retry:
 		if (!(gfp_mask & __GFP_NOMEMALLOC_BS)) {
 			/* go through the zonelist yet again, ignore mins */
 			for (i = 0; (z = zones[i]) != NULL; i++) {
-				if (!cpuset_zone_allowed_bs(z))
+				if (!cpuset_zone_allowed_bs(z, gfp_mask))
 					continue;
 
 				page = buffered_rmqueue_bs(z, order, gfp_mask);
@@ -1364,7 +1376,7 @@ rebalance:
 					gfp_mask & __GFP_HIGH))
 				continue;
 
-			if (!cpuset_zone_allowed_bs(z))
+			if (!cpuset_zone_allowed_bs(z, gfp_mask))
 				continue;
 
 			page = buffered_rmqueue_bs(z, order, gfp_mask);
@@ -1384,7 +1396,7 @@ rebalance:
 					classzone_idx, 0, 0))
 				continue;
 
-			if (!cpuset_zone_allowed_bs(z))
+			if (!cpuset_zone_allowed_bs(z, __GFP_HARDWALL_BS))
 				continue;
 
 			page = buffered_rmqueue_bs(z, order, gfp_mask);
@@ -1428,7 +1440,7 @@ got_pg:
 }
 EXPORT_SYMBOL_GPL(__alloc_pages_bs);
 
-fastcall_bs unsigned long get_zeroed_page_bs(unsigned int __nocast gfp_mask)
+fastcall_bs unsigned long get_zeroed_page_bs(gfp_t_bs __nocast gfp_mask)
 {
 	struct page_bs *page;
 
@@ -1465,7 +1477,7 @@ EXPORT_SYMBOL_GPL(free_pages_bs);
 /*
  * Common helper functions
  */
-fastcall_bs unsigned long __get_free_pages_bs(unsigned int __nocast gfp_mask,
+fastcall_bs unsigned long __get_free_pages_bs(gfp_t_bs __nocast gfp_mask,
 						unsigned int order)
 {
 	struct page_bs *page;
@@ -1476,18 +1488,21 @@ fastcall_bs unsigned long __get_free_pages_bs(unsigned int __nocast gfp_mask,
 	return (unsigned long)page_address_bs(page);
 }
 
-void __get_page_state_bs(struct page_state_bs *ret, int nr)
+void __get_page_state_bs(struct page_state_bs *ret, 
+					int nr, cpumask_t *cpumask)
 {
 	int cpu = 0;
 
 	memset(ret, 0, sizeof(*ret));
+
+	cpu = cpumask_first(cpumask);
 
 	while (cpu < NR_CPUS_BS) {
 		unsigned long *in, *out, off;
 
 		in = (unsigned long *)&per_cpu_bs(page_states_bs, cpu);
 
-		cpu++;
+		cpu = cpumask_next(cpu, cpumask);
 
 		if (cpu < NR_CPUS_BS)
 			prefetch(&per_cpu_bs(page_states_bs, cpu));
@@ -1499,9 +1514,22 @@ void __get_page_state_bs(struct page_state_bs *ret, int nr)
 	
 }
 
+void get_page_state_node(struct page_state_bs *ret, int node)
+{
+	int nr;
+	cpumask_t mask = node_to_cpumask_bs(node);
+
+	nr = offsetof(struct page_state_bs, GET_PAGE_STATE_LAST_BS);
+	nr /= sizeof(unsigned long);
+
+	__get_page_state_bs(ret, nr+1, &mask);
+}
+
 void get_full_page_state_bs(struct page_state_bs *ret)
 {
-	__get_page_state_bs(ret, sizeof(*ret) / sizeof(unsigned long));
+	cpumask_t mask = CPU_MASK_ALL;
+
+	__get_page_state_bs(ret, sizeof(*ret) / sizeof(unsigned long), &mask);
 }
 
 static void *frag_start_bs(struct seq_file *m, loff_t *pos)

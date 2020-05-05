@@ -14,6 +14,7 @@
 #include "biscuitos/mm.h"
 #include "biscuitos/slab.h"
 #include "biscuitos/gfp.h"
+#include "biscuitos/string.h"
 
 struct node_default {
 	unsigned long index;
@@ -87,3 +88,42 @@ out_alloc:
 	return 0;
 }
 slab_initcall_bs(TestCase_kmem_cache_func);
+
+/*
+ * TestCase: kstrdup_bs
+ */
+static int __unused TestCase_kstrdup(void)
+{
+	const char *string;
+
+	string = kstrdup_bs("BiscuitOS", GFP_KERNEL_BS);
+	if (!string) {
+		printk("%s kstrdup() failed.\n", __func__);
+		return -ENOMEM;
+	}
+	bs_debug("[%#lx] %s\n", (unsigned long)string, string);
+
+	kfree_bs(string);
+	return 0;
+}
+slab_initcall_bs(TestCase_kstrdup);
+
+/*
+ * TestCase: Zero 
+ */
+static int __unused TestCase_kzalloc(void)
+{
+	struct node_default *np;
+
+	np = kzalloc_bs(sizeof(*np), GFP_KERNEL_BS);
+	if (!np) {
+		printk("%s kzalloc() failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	bs_debug("[%#lx-%s] %#lx\n", (unsigned long)np, __func__, np->index);
+
+	kfree_bs(np);
+	return 0;
+}
+slab_initcall_bs(TestCase_kzalloc);

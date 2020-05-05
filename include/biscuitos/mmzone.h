@@ -404,5 +404,7 @@ static inline struct zone_bs *next_zone_bs(struct zone_bs *zone)
 extern int zone_watermark_ok_bs(struct zone_bs *z, int order, 
   unsigned long mark, int classzone_idx, int can_try_harder, int gfp_high);
 extern void wakeup_kswapd_bs(struct zone_bs *zone, int order);
+#define sparse_init_bs()	do {} while (0)
+#define sparse_index_init_bs(_sec, _nid)  do {} while (0)
 
 #endif
