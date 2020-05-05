@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/smp.h>
+#include <linux/cpumask.h>
 #include "biscuitos/kernel.h"
 #include "biscuitos/init.h"
 #include "biscuitos/percpu.h"
@@ -55,3 +56,36 @@ static int __unused TestCase_percpu(void)
 	return 0;
 }
 percpu_initcall_bs(TestCase_percpu);
+
+/*
+ * TestCase: alloc_percpu/free_percpu
+ */
+static int __unused TestCase_alloc_percpu(void)
+{
+	struct node_percpu __percpu *np, *ptr;
+	int cpu;
+
+	/* Allocate percpu */
+	np = alloc_percpu_bs(struct node_percpu);
+	if (!np) {
+		printk("%s __alloc_percpu failed.\n", __func__);
+		return -ENOMEM;
+	}
+
+	/* setup */
+	for_each_possible_cpu(cpu) {
+		ptr = per_cpu_ptr_bs(np, cpu);
+		ptr->index = cpu * 0x10;
+	}
+
+	/* usage */
+	for_each_possible_cpu(cpu) {
+		ptr = per_cpu_ptr_bs(np, cpu);
+		bs_debug("CPU-%d Index %#lx\n", cpu, ptr->index);
+	}
+	
+	/* free percpu */
+	free_percpu_bs(np);
+	return 0;
+}
+slab_initcall_bs(TestCase_alloc_percpu);
