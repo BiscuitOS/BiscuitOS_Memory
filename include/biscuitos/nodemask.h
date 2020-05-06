@@ -66,6 +66,8 @@ static inline void __nodes_clear_bs(nodemask_t_bs *dstp, int nbits)
 #endif /* MAX_NUMNODES_BS */
 
 
+#define for_each_node_bs(node)					\
+		for_each_node_mask_bs((node), node_possible_map_bs)
 #define node_set_online_bs(node)				\
 		set_bit((node), node_online_map_bs.bits)
 #define for_each_online_node_bs(node)				\
