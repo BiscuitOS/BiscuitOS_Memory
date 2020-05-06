@@ -28,7 +28,7 @@
 struct page_bs *find_get_entry_bs(struct address_space *mapping, 
 							pgoff_t offset)
 {
-	;
+	return NULL;
 }
 
 /**             

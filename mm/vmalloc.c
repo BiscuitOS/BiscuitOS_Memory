@@ -5,6 +5,7 @@
  *  Support of BIGMEM added by Gerhard Wichert, Siemens AG, July 1999
  *  SMP-safe vmalloc/vfree/ioremap, Tigran Aivazian <tigran@veritas.com>, May 2000
  *  Major rework to support vmap/vunmap, Christoph Hellwig, SGI, August 2002
+ *  Numa awareness, Christoph Lameter, SGI, June 2005
  */
 
 #include <linux/kernel.h>
@@ -158,8 +159,9 @@ int map_vm_area_bs(struct vm_struct_bs *area, pgprot_t_bs prot,
 	return err;
 }
 
-struct vm_struct_bs *__get_vm_area_bs(unsigned long size, unsigned long flags,
-			unsigned long start, unsigned long end)
+struct vm_struct_bs *
+__get_vm_area_node_bs(unsigned long size, unsigned long flags,
+			unsigned long start, unsigned long end, int node)
 {
 	struct vm_struct_bs **p, *tmp, *area;
 	unsigned long align = 1;
@@ -178,7 +180,7 @@ struct vm_struct_bs *__get_vm_area_bs(unsigned long size, unsigned long flags,
 	addr = ALIGN(start, align);
 	size = PAGE_ALIGN_BS(size);
 
-	area = kmalloc_bs(sizeof(*area), GFP_KERNEL_BS);
+	area = kmalloc_node_bs(sizeof(*area), GFP_KERNEL_BS, node);
 	if (unlikely(!area))
 		return NULL;
 
@@ -230,6 +232,12 @@ out:
 	return NULL;
 }
 
+struct vm_struct_bs *__get_vm_area_bs(unsigned long size, unsigned long flags,
+				unsigned long start, unsigned long end)
+{
+	return __get_vm_area_node_bs(size, flags, start, end, -1);
+}
+
 /**
  *      get_vm_area  -  reserve a contingous kernel virtual area
  *
@@ -243,6 +251,13 @@ out:
 struct vm_struct_bs *get_vm_area_bs(unsigned long size, unsigned long flags)
 {
 	return __get_vm_area_bs(size, flags, VMALLOC_START_BS, VMALLOC_END_BS);
+}
+
+struct vm_struct_bs *get_vm_area_node_bs(unsigned long size, 
+					unsigned long flags, int node)
+{
+	return __get_vm_area_node_bs(size, flags, 
+				VMALLOC_START_BS, VMALLOC_END_BS, node);
 }
 
 /* Caller must hold vmlist_lock */
@@ -286,8 +301,8 @@ struct vm_struct_bs *remove_vm_area_bs(void *addr)
 	return v;
 }
 
-void *__vmalloc_area_bs(struct vm_struct_bs *area, 
-				gfp_t_bs gfp_mask, pgprot_t_bs prot)
+void *__vmalloc_area_node_bs(struct vm_struct_bs *area, 
+				gfp_t_bs gfp_mask, pgprot_t_bs prot, int node)
 {
 	struct page_bs **pages;
 	unsigned int nr_pages, array_size, i;
@@ -298,9 +313,11 @@ void *__vmalloc_area_bs(struct vm_struct_bs *area,
 	area->nr_pages = nr_pages;
 	/* Please note that the recursion is strictly bounded. */
 	if (array_size > PAGE_SIZE_BS)
-		pages = __vmalloc_bs(array_size, gfp_mask, PAGE_KERNEL_BS);
+		pages = __vmalloc_node_bs(array_size, 
+					gfp_mask, PAGE_KERNEL_BS, node);
 	else
-		pages = kmalloc_bs(array_size, (gfp_mask & ~__GFP_HIGHMEM_BS));
+		pages = kmalloc_node_bs(array_size, 
+					(gfp_mask & ~__GFP_HIGHMEM_BS), node);
 	area->pages = pages;
 	if (!area->pages) {
 		remove_vm_area_bs(area->addr);
@@ -310,7 +327,10 @@ void *__vmalloc_area_bs(struct vm_struct_bs *area,
 	memset(area->pages, 0, array_size);
 
 	for (i = 0; i < area->nr_pages; i++) {
-		area->pages[i] = alloc_page_bs(gfp_mask);
+		if (node < 0)
+			area->pages[i] = alloc_page_bs(gfp_mask);
+		else
+			area->pages[i] = alloc_pages_node_bs(node, gfp_mask, 0);
 		if (unlikely(!area->pages[i])) {
 			/* Successfully allocated i pages, free them in
 			 * __vunmap()
@@ -328,6 +348,14 @@ fail:
 	vfree_bs(area->addr);
 	return NULL;
 }
+
+void *__vmalloc_area_bs(struct vm_struct_bs *area, gfp_t_bs gfp_mask, 
+							pgprot_t_bs prot)
+{
+	return __vmalloc_area_node_bs(area, gfp_mask, prot, -1);
+}
+
+
 
 void __vunmap_bs(void *addr, int deallocate_pages)
 {
@@ -437,18 +465,19 @@ void vfree_bs(void *addr)
 EXPORT_SYMBOL_GPL(vfree_bs);
 
 /**
- *      __vmalloc  -  allocate virtually contiguous memory
+ *	__vmalloc_node  -  allocate virtually contiguous memory
  *
- *      @size:          allocation size
- *      @gfp_mask:      flags for the page level allocator
- *      @prot:          protection mask for the allocated pages
+ *	@size:		allocation size
+ *	@gfp_mask:	flags for the page level allocator
+ *	@prot:		protection mask for the allocated pages
+ *	@node:		node to use for allocation or -1
  *
- *      Allocate enough pages to cover @size from the page level
- *      allocator with @gfp_mask flags.  Map them into contiguous
- *      kernel virtual space, using a pagetable protection of @prot.
+ *	Allocate enough pages to cover @size from the page level
+ *	allocator with @gfp_mask flags.  Map them into contiguous
+ *	kernel virtual space, using a pagetable protection of @prot.
  */
-void *__vmalloc_bs(unsigned long size, gfp_t_bs gfp_mask, 
-							pgprot_t_bs prot)
+void *__vmalloc_node_bs(unsigned long size, gfp_t_bs gfp_mask, 
+					pgprot_t_bs prot, int node)
 {
 	struct vm_struct_bs *area;
 
@@ -456,11 +485,38 @@ void *__vmalloc_bs(unsigned long size, gfp_t_bs gfp_mask,
 	if (!size || (size >> PAGE_SHIFT_BS) > num_physpages_bs)
 		return NULL;
 
-	area = get_vm_area_bs(size, VM_ALLOC_BS);
+	area = get_vm_area_node_bs(size, VM_ALLOC_BS, node);
+	if (!area)
+		return NULL;
 
-	return __vmalloc_area_bs(area, gfp_mask, prot);
+	return __vmalloc_area_node_bs(area, gfp_mask, prot, node);
+}
+EXPORT_SYMBOL(__vmalloc_node_bs);
+
+void *__vmalloc_bs(unsigned long size, gfp_t_bs gfp_mask, pgprot_t_bs prot)
+{
+	return __vmalloc_node_bs(size, gfp_mask, prot, -1);
 }
 EXPORT_SYMBOL_GPL(__vmalloc_bs);
+
+/**
+ *	vmalloc_node  -  allocate memory on a specific node
+ *
+ *	@size:		allocation size
+ *	@node:		numa node
+ *
+ *	Allocate enough pages to cover @size from the page level
+ *	allocator and map them into contiguous kernel virtual space.
+ *
+ *	For tight cotrol over page level allocator and protection flags
+ *	use __vmalloc() instead.
+ */
+void *vmalloc_node_bs(unsigned long size, int node)
+{
+       return __vmalloc_node_bs(size, GFP_KERNEL_BS | __GFP_HIGHMEM_BS, 
+					PAGE_KERNEL_BS, node);
+}
+EXPORT_SYMBOL_GPL(vmalloc_node_bs);
 
 /**     
  *      vmalloc  -  allocate virtually contiguous memory

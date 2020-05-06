@@ -28,13 +28,23 @@ struct vm_struct_bs {
 	struct vm_struct_bs	*next;
 };
 
-void *vmalloc_bs(unsigned long size);
-void vfree_bs(void *addr);
-void *__vmalloc_bs(unsigned long size, gfp_t_bs gfp_mask, pgprot_t_bs prot);
-void vunmap_bs(void *addr);
-void *vmap_bs(struct page_bs **, unsigned int, unsigned long, pgprot_t_bs);
-
+extern void *vmalloc_bs(unsigned long size);
 extern void *vmalloc_32_bs(unsigned long size);
 extern void *vmalloc_exec_bs(unsigned long size);
+extern void *vmalloc_node_bs(unsigned long size, int node);
+extern void *__vmalloc_bs(unsigned long size, 
+					gfp_t_bs gfp_mask, pgprot_t_bs prot);
+extern void *__vmalloc_area_bs(struct vm_struct_bs *area, gfp_t_bs gfp_mask,
+				pgprot_t_bs prot);
+extern void *__vmalloc_node_bs(unsigned long size, gfp_t_bs gfp_mask,
+				pgprot_t_bs prot, int node);
+extern void vfree_bs(void *addr);
+
+extern void *vmap_bs(struct page_bs **pages, unsigned int count,
+			unsigned long flags, pgprot_t_bs prot);
+extern void vunmap_bs(void *addr);
+
+extern struct vm_struct_bs *get_vm_area_node_bs(unsigned long size,
+					unsigned long flags, int node);
 
 #endif
