@@ -198,7 +198,7 @@ void *mempool_alloc_bs(mempool_t_bs *pool, gfp_t_bs gfp_mask)
 	void *element;
 	unsigned long flags;
 	DEFINE_WAIT(wait);
-	int gfp_temp;
+	gfp_t_bs gfp_temp;
 
 	might_sleep_if(gfp_mask & __GFP_WAIT_BS);
 

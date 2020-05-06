@@ -48,8 +48,6 @@ static int TestCase_fixmap(void)
 	sprintf((char *)addr, "BiscuitOS-%s", __func__);
 	bs_debug("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
-	/* no need unmap */
-	free_page_bs((unsigned long)page);
 	return 0;
 }
 fixmap_initcall_bs(TestCase_fixmap);

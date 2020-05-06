@@ -43,7 +43,6 @@ static int TestCase_kmap(void)
 
 	/* kunmap */
 	kunmap_bs(page);
-	free_page_bs((unsigned long)page);
 	return 0;
 }
 kmap_initcall_bs(TestCase_kmap);
@@ -76,7 +75,6 @@ static int TestCase_kmap_low(void)
 
 	/* kunmap */
 	kunmap_bs(page);
-	free_page_bs((unsigned long)page);
 	return 0;
 }
 kmap_initcall_bs(TestCase_kmap_low);
@@ -108,7 +106,6 @@ static int TestCase_kmap_high(void)
 
 	/* kumap */
 	kunmap_high_bs(page);
-	free_page_bs((unsigned long)page);
 	return 0;
 }
 kmap_initcall_bs(TestCase_kmap_high);
@@ -141,7 +138,6 @@ static int TestCase_kmap_atomic(void)
 
 	/* unmap */
 	kunmap_atomic_bs(addr, KM_USER0_BS);
-	free_page_bs((unsigned long)page);
 	return 0;
 }
 kmap_initcall_bs(TestCase_kmap_atomic);

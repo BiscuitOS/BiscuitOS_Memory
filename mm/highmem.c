@@ -147,7 +147,21 @@ done:
 	return;
 }
 
+/*
+ * Virtual_count is not a pure "count".
+ *  0 means that it is not mapped, and has not been mapped
+ *    since a TLB flush - it is usable.
+ *  1 means that there are no users, but it has been mapped
+ *    since the last TLB flush - so we can't use it.
+ *  n means that there are (n-1) current users of it.
+ */
 #ifdef CONFIG_HIGHMEM_BS
+
+static void *page_pool_alloc_bs(gfp_t_bs gfp_mask, void *data)
+{
+	return alloc_page_bs(gfp_mask);
+}
+
 static int pkmap_count_bs[LAST_PKMAP_BS];
 static unsigned int last_pkmap_nr_bs;
 static __cacheline_aligned_in_smp_bs DEFINE_SPINLOCK(kmap_lock_bs);
@@ -396,13 +410,11 @@ struct page_bs *kmap_atomic_to_page_bs(void *ptr)
 
 #endif
 
-static mempool_t_bs *page_pool_bs;
+static mempool_t_bs *page_pool_bs, *isa_page_pool_bs;
 
-static void *page_pool_alloc_bs(gfp_t_bs gfp_mask, void *data)
+static void *page_pool_alloc_isa_bs(gfp_t_bs gfp_mask, void *data)
 {
-	unsigned int gfp = gfp_mask | (unsigned int)(long)data;
-
-	return alloc_page_bs(gfp);
+	return alloc_page_bs(gfp_mask | GFP_DMA_BS);
 }
 
 static void page_pool_free_bs(void *page, void *data)
@@ -433,3 +445,23 @@ static __init int init_emergency_pool_bs(void)
 	return 0;
 }
 module_initcall_bs(init_emergency_pool_bs);
+
+#define ISA_POOL_SIZE_BS	16
+
+/*
+ * gets called "every" time someone init's a queue with BLK_BOUNCE_ISA
+ * as the max address, so check if the pool has already been created.
+ */
+int __unused init_emergency_isa_pool_bs(void)
+{
+	if (isa_page_pool_bs)
+		return 0;
+
+	isa_page_pool_bs = mempool_create_bs(ISA_POOL_SIZE_BS, 
+			page_pool_alloc_isa_bs, page_pool_free_bs, NULL);
+	if (!isa_page_pool_bs)
+		BUG_BS();
+
+	printk("isa bounce pool size: %d pages\n", ISA_POOL_SIZE_BS);
+	return 0;
+}
