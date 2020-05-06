@@ -1,7 +1,7 @@
 #ifndef _BISCUITOS_SLAB_H
 #define _BISCUITOS_SLAB_H
 
-typedef struct kmem_cache_s_bs kmem_cache_t_bs;
+typedef struct kmem_cache_bs kmem_cache_t_bs;
 
 #include <linux/compiler.h>
 #include "biscuitos/gfp.h"
@@ -104,7 +104,7 @@ static inline void *kmalloc_node_bs(size_t size, gfp_t_bs flags, int node)
 }
 
 static inline void *kmem_cache_alloc_node_bs(kmem_cache_t_bs *cachep,
-				int flags, int node)
+				gfp_t_bs flags, int node)
 {
 	return kmem_cache_alloc_bs(cachep, flags);
 }

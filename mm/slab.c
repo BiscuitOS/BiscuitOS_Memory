@@ -381,7 +381,7 @@ static struct cache_names_bs __initdata cache_names_bs[] = {
  *
  * manages a cache
  */
-struct kmem_cache_s_bs {
+struct kmem_cache_bs {
 /* 1) per-cpu data, touched during every alloc/free */
 	struct array_cache_bs	*array[NR_CPUS_BS];
 	unsigned int		batchcount;
@@ -399,7 +399,7 @@ struct kmem_cache_s_bs {
 	unsigned int		gfporder;
 
 	/* force GFP flags, e.g. GFP_DMA */
-	unsigned int		gfpflags;
+	gfp_t_bs		gfpflags;
 
 	size_t			colour;		/* cache colouring range */
 	unsigned int		colour_off;	/* colour offset */
@@ -448,7 +448,7 @@ struct kmem_cache_s_bs {
 /* Optimization question: fewer reaps means less 
  * probability for unnessary cpucache drain/refill cycles.
  *
- * OTHO the cpuarrays can contain lots of objects,
+ * OTOH the cpuarrays can contain lots of objects,
  * which could lock up otherwise freeable slabs.
  */
 #define REAPTIMEOUT_CPUC_BS	(2*HZ)
@@ -512,14 +512,30 @@ struct kmem_cache_s_bs {
 #define BREAK_GFP_ORDER_LO_BS	0
 static int slab_break_gfp_order_bs = BREAK_GFP_ORDER_LO_BS;
 
-/* Macros for storing/retrieving the cachep and or slab from the
+/* Functions for storing/retrieving the cachep and or slab from the
  * global 'mem_map'. These are used to find the slab an obj belongs to.
  * With kfree(), these are used to find the cache which an obj belongs to.
  */
-#define SET_PAGE_CACHE_BS(pg,x)	((pg)->lru.next = (struct list_head *)(x))
-#define GET_PAGE_CACHE_BS(pg)	((kmem_cache_t_bs *)(pg)->lru.next)
-#define SET_PAGE_SLAB_BS(pg,x)	((pg)->lru.prev = (struct list_head *)(x))
-#define GET_PAGE_SLAB_BS(pg)	((struct slab_bs *)(pg)->lru.prev)
+static inline void page_set_cache_bs(struct page_bs *page, 
+					struct kmem_cache_bs *cache)
+{
+	page->lru.next = (struct list_head *)cache;
+}
+
+static inline struct kmem_cache_bs *page_get_cache_bs(struct page_bs *page)
+{
+	return (struct kmem_cache_bs *)page->lru.next;
+}
+
+static inline void page_set_slab_bs(struct page_bs *page, struct slab_bs *slab)
+{
+	page->lru.prev = (struct list_head *)slab;
+}
+
+static inline struct slab_bs *page_get_slab_bs(struct page_bs *page)
+{
+	return (struct slab_bs *)page->lru.prev;
+}
 
 static struct arraycache_init_bs initarray_cache_bs __initdata = {
 	{ 0, BOOT_CPUCACHE_ENTRIES_BS, 1, 0} 
@@ -588,7 +604,7 @@ static int __node_shrink_bs(kmem_cache_t_bs *cachep, int node);
 static void free_block_bs(kmem_cache_t_bs *cachep,
                        void **objpp, int nr_objects, int node);
 
-static void kmem_flagcheck_bs(kmem_cache_t_bs *cachep, unsigned int flags)
+static void kmem_flagcheck_bs(kmem_cache_t_bs *cachep, gfp_t_bs flags)
 {
 	if (flags & SLAB_DMA_BS) {
 		if (!(cachep->gfpflags & GFP_DMA_BS))
@@ -767,11 +783,7 @@ static void *kmem_getpages_bs(kmem_cache_t_bs *cachep,
 	int i;
 
 	flags |= cachep->gfpflags;
-	if (likely(nodeid == -1)) {
-		page = alloc_pages_bs(flags, cachep->gfporder);
-	} else {
-		page = alloc_pages_node_bs(nodeid, flags, cachep->gfporder);
-	}
+	page = alloc_pages_node_bs(nodeid, flags, cachep->gfporder);
 	if (!page)
 		return NULL;
 	addr = page_address_bs(page);
@@ -819,8 +831,8 @@ static void set_slab_attr_bs(kmem_cache_t_bs *cachep,
 	i = 1 << cachep->gfporder;
 	page = virt_to_page_bs(objp);
 	do {
-		SET_PAGE_CACHE_BS(page, cachep);
-		SET_PAGE_SLAB_BS(page, slabp);
+		page_set_cache_bs(page, cachep);
+		page_set_slab_bs(page, slabp);
 		page++;
 	} while (--i);
 }
@@ -909,7 +921,7 @@ static int cache_grow_bs(kmem_cache_t_bs *cachep,
 	struct slab_bs	*slabp;
 	void		*objp;
 	size_t		offset;
-	unsigned int	local_flags;
+	gfp_t_bs	local_flags;
 	unsigned long	ctor_flags;
 	struct kmem_list3_bs *l3;
 
@@ -1058,6 +1070,7 @@ retry:
 			next = slab_bufctl_bs(slabp)[slabp->free];
 #if DEBUG
 			slab_bufctl_bs(slabp)[slabp->free] = BUFCTL_FREE_BS;
+			WARN_ON(numa_node_id_bs() != slabp->nodeid);
 #endif
 			slabp->free = next;
 		}
@@ -1178,7 +1191,7 @@ static void check_poison_obj_bs(kmem_cache_t_bs *cachep, void *objp)
 		/* Print some data about the neighboring objects, if they
 		 * exist:
 		 */
-		struct slab_bs *slabp = GET_PAGE_SLAB_BS(virt_to_page_bs(objp));
+		struct slab_bs *slabp = page_get_slab_bs(virt_to_page_bs(objp));
 		int objnr;
 
 		objnr = (objp-slabp->s_mem)/cachep->objsize;
@@ -1279,15 +1292,15 @@ static void *cache_free_debugcheck_bs(kmem_cache_t_bs *cachep,
 	kfree_debugcheck_bs(objp);
 	page = virt_to_page_bs(objp);
 
-	if (GET_PAGE_CACHE_BS(page) != cachep) {
+	if (page_get_cache_bs(page) != cachep) {
 		printk(KERN_INFO "mismatch in kmem_cache_free: expected "
-			"cache %p, got %p\n", GET_PAGE_CACHE_BS(page), cachep);
+			"cache %p, got %p\n", page_get_cache_bs(page), cachep);
 		printk(KERN_INFO "%p is %s.\n", cachep, cachep->name);
-		printk(KERN_INFO "%p is %s.\n", GET_PAGE_CACHE_BS(page),
-					GET_PAGE_CACHE_BS(page)->name);
+		printk(KERN_INFO "%p is %s.\n", page_get_cache_bs(page),
+					page_get_cache_bs(page)->name);
 		WARN_ON_BS(1);
 	}
-	slabp = GET_PAGE_SLAB_BS(page);
+	slabp = page_get_slab_bs(page);
 
 	if (cachep->flags & SLAB_RED_ZONE_BS) {
 		if (*dbg_redzone1_bs(cachep, objp) != RED_ACTIVE_BS ||
@@ -1471,13 +1484,16 @@ static void free_block_bs(kmem_cache_t_bs *cachep,
 		struct slab_bs *slabp;
 		unsigned int objnr;
 
-		slabp = GET_PAGE_SLAB_BS(virt_to_page_bs(objp));
+		slabp = page_get_slab_bs(virt_to_page_bs(objp));
 		l3 = cachep->nodelists[node];
 		list_del(&slabp->list);
 		objnr = (objp - slabp->s_mem) / cachep->objsize;
 		check_spinlock_acquired_node_bs(cachep, node);
 		check_slabp_bs(cachep, slabp);
 #if DEBUG
+		/* Verify that the slab belongs to the intended node */
+		WARN_ON_BS(slabp->nodeid != node);
+
 		if (slab_bufctl_bs(slabp)[objnr] != BUFCTL_FREE_BS) {
 			printk(KERN_INFO "slab: double free detected in "
 			     "cache '%s', objp %p.\n", cachep->name, objp);
@@ -1789,7 +1805,7 @@ void kfree_bs(const void *objp)
 		return;
 	local_irq_save(flags);
 	kfree_debugcheck_bs(objp);
-	c = GET_PAGE_CACHE_BS(virt_to_page_bs(objp));
+	c = page_get_cache_bs(virt_to_page_bs(objp));
 	__cache_free_bs(c, (void *)objp);
 	local_irq_restore(flags);
 }
@@ -1906,7 +1922,7 @@ int fastcall_bs kmem_ptr_validate_bs(kmem_cache_t_bs *cachep, void *ptr)
 	page = virt_to_page_bs(ptr);
 	if (unlikely(!PageSlab_bs(page)))
 		goto out;
-	if (unlikely(GET_PAGE_CACHE_BS(page) != cachep))
+	if (unlikely(page_get_cache_bs(page) != cachep))
 		goto out;
 	return 1;
 out:
@@ -1968,6 +1984,7 @@ kmem_cache_create_bs(const char *name, size_t size, size_t align,
 {
 	size_t left_over, slab_size, ralign;
 	kmem_cache_t_bs *cachep = NULL;
+	struct list_head *p;
 
 	/*
 	 * Sanity checks... these are all serious usage bugs.
@@ -1980,6 +1997,35 @@ kmem_cache_create_bs(const char *name, size_t size, size_t align,
 		printk(KERN_INFO "%s: Early error in slab %s\n",
 				__FUNCTION__, name);
 		BUG_BS();
+	}
+
+	down(&cache_chain_sem_bs);
+
+	list_for_each(p, &cache_chain_bs) {
+		kmem_cache_t_bs *pc = list_entry(p, kmem_cache_t_bs, next);
+		mm_segment_t old_fs = get_fs();
+		char tmp;
+		int res;
+
+		/*
+		 * This happens when the module gets unloaded and doesn't
+		 * destroy its slab cache and no-one else reuses the vmalloc
+		 * area of the module.  Print a warning.
+		 */
+		set_fs(KERNEL_DS);
+		res = __get_user(tmp, pc->name);
+		set_fs(old_fs);
+		if (res) {
+			printk("SLAB: cache with size %d has lost its name\n",
+					pc->objsize);
+			continue;
+		}
+
+		if (!strcmp(pc->name,name)) {
+			printk("kmem_cache_create: duplicate cache %s\n", name);
+			dump_stack();
+			goto oops;
+		}
 	}
 
 #if DEBUG
@@ -2063,7 +2109,7 @@ kmem_cache_create_bs(const char *name, size_t size, size_t align,
 	cachep = (kmem_cache_t_bs *)kmem_cache_alloc_bs(&cache_cache_bs,
 					SLAB_KERNEL_BS);
 	if (!cachep)
-		goto opps;
+		goto oops;
 	memset(cachep, 0, sizeof(kmem_cache_t_bs));
 
 #if DEBUG
@@ -2162,7 +2208,7 @@ next:
 		printk("kmem_cache_create: couldn't create cache %s.\n", name);
 		kmem_cache_free_bs(&cache_cache_bs, cachep);
 		cachep = NULL;
-		goto opps;
+		goto oops;
 	}
 	slab_size = ALIGN(cachep->num * sizeof(kmem_bufctl_t_bs) +
 					sizeof(struct slab_bs), align);
@@ -2263,49 +2309,14 @@ next:
 		cachep->limit = BOOT_CPUCACHE_ENTRIES_BS;
 	}
 
-	/* Need the semaphore to access the chain */
-	down(&cache_chain_sem_bs);
-	{
-		struct list_head *p;
-		mm_segment_t old_fs;
-	
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		list_for_each(p, &cache_chain_bs) {
-			kmem_cache_t_bs *pc = 
-					list_entry(p, kmem_cache_t_bs, next);
-			char tmp;
-
-			/* This happens when the module gets unloaded and 
-			 * doesn't destroy its slab cache and noone else
-			 * reuses the vmalloc area of the module. Print a
-			 * warning.
-			 */
-			if (__get_user(tmp, pc->name)) {
-				printk("SLAB: cahce with size %d has lost "
-						"its name\n", pc->objsize);
-				continue;
-			}
-			if (!strcmp(pc->name, name)) {
-				printk("kmem_cache_create: duplicate "
-							"cache %s\n", name);
-				up(&cache_chain_sem_bs);
-				// unlock_cpu_hotplug
-				BUG_BS();
-			}
-		}
-
-		set_fs(old_fs);
-	}
-
 	/* cache setup completed, link it into the list */
 	list_add(&cachep->next, &cache_chain_bs);
-	up(&cache_chain_sem_bs);
 	// unlock_cup_hotplug();
-opps:
+oops:
 	if (!cachep && (flags & SLAB_PANIC_BS))
 		panic("kmem_cache_create(): failed to create slab '%s'\n",
 					name);
+	up(&cache_chain_sem_bs);
 	return cachep;
 }
 EXPORT_SYMBOL_GPL(kmem_cache_create_bs);
@@ -2360,6 +2371,7 @@ static void drain_array_locked_bs(kmem_cache_t_bs *cachep,
 
 /**
  * cache_reap - Reclaim memory from caches.
+ * @unused: unused parameter
  *
  * Called from workqueue/eventd every few seconds.
  * Purpose:
@@ -2378,7 +2390,7 @@ static void cache_reap_bs(struct work_struct *w)
 		/* Give up. Setup the next iteration */
 		schedule_delayed_work(
 			(struct delayed_work *)&__get_cpu_var_bs(reap_work_bs),
-			REAPTIMEOUT_CPUC_BS + smp_processor_id());
+			REAPTIMEOUT_CPUC_BS);
 	}
 
 	list_for_each(walk, &cache_chain_bs) {
@@ -2447,7 +2459,7 @@ next:
 	/* Setup the next iteration */
 	schedule_delayed_work(
 			(struct delayed_work *)&__get_cpu_var_bs(reap_work_bs), 
-			REAPTIMEOUT_CPUC_BS + smp_processor_id());
+			REAPTIMEOUT_CPUC_BS);
 }
 
 /*
@@ -3130,7 +3142,7 @@ unsigned int ksize_bs(const void *objp)
 	if (unlikely(objp == NULL))
 		return 0;
 
-	return obj_reallen_bs(GET_PAGE_CACHE_BS(virt_to_page_bs(objp)));
+	return obj_reallen_bs(page_get_cache_bs(virt_to_page_bs(objp)));
 }
 
 
