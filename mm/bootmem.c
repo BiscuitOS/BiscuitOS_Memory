@@ -202,6 +202,8 @@ restart_scan:
 
 		i = find_next_zero_bit(bdata->node_bootmem_map, eidx, i);
 		i = ALIGN(i, incr);
+		if (i >= eidx)
+			break;
 		if (test_bit(i, bdata->node_bootmem_map))
 			continue;
 		for (j = i + 1; j < i + areasize; ++j) {
@@ -309,6 +311,7 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 				if (j + 16 < BITS_PER_LONG_BS)
 					prefetchw(page + j + 16);
 				__ClearPageReserved_bs(page + j);
+				set_page_count_bs(page + j, 0);
 			}
 			__free_pages_bs(page, order);
 			i += BITS_PER_LONG_BS;

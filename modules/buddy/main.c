@@ -15,6 +15,15 @@
 #include "biscuitos/gfp.h"
 
 /*
+ * TestCase: alloc page from DMA
+ */
+static int TestCase_alloc_page_from_DMA(void)
+{
+	return 0;
+}
+buddy_initcall_bs(TestCase_alloc_page_from_DMA);
+
+/*
  * TestCase: alloc page from Normal Zone
  */
 static int TestCase_alloc_page_from_normal(void)
@@ -40,7 +49,7 @@ static int TestCase_alloc_page_from_normal(void)
 	bs_debug("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
 	/* free all pages to buddy */
-	free_pages_bs((unsigned long)pages, order);
+	free_pages_bs((unsigned long)addr, order);
 
 	return 0;
 }
@@ -75,7 +84,7 @@ static int TestCase_alloc_page_from_highmem(void)
 	}
 
 	/* free pages */
-	free_pages_bs((unsigned long)pages, order);
+	free_pages_bs((unsigned long)addr, order);
 
 	return 0;
 }

@@ -16,21 +16,20 @@
 #define PG_active_bs		6
 #define PG_slab_bs		7	/* slab debug (Suparna wants this) */
 
-#define PG_highmem_bs		8
-#define PG_checked_bs		9	/* kill me in 2.5.<early>. */
-#define PG_arch_1_bs		10
-#define PG_reserved_bs		11
+#define PG_checked_bs		8	/* kill me in 2.5.<early>. */
+#define PG_arch_1_bs		9
+#define PG_reserved_bs		10
 
-#define PG_private_bs		12	/* Has something at ->private */
-#define PG_writeback_bs		13	/* Page is under writeback */
-#define PG_nosave_bs		14	/* Used for system suspend/resume */
-#define PG_compound_bs		15	/* Part of a compound page */
+#define PG_private_bs		11	/* Has something at ->private */
+#define PG_writeback_bs		12	/* Page is under writeback */
+#define PG_nosave_bs		13	/* Used for system suspend/resume */
+#define PG_compound_bs		14	/* Part of a compound page */
 
-#define PG_swapcache_bs		16	/* Swap page: swp_entry_t in private */
-#define PG_mappedtodisk_bs	17	/* Has blocks allocated on-disk */
-#define PG_reclaim_bs		18	/* To be reclaimed asap */
-#define PG_nosave_free_bs	19	/* Free, should not be written */
-#define PG_uncached_bs		20	/* Page has been mapped as uncached */
+#define PG_swapcache_bs		15	/* Swap page: swp_entry_t in private */
+#define PG_mappedtodisk_bs	16	/* Has blocks allocated on-disk */
+#define PG_reclaim_bs		17	/* To be reclaimed asap */
+#define PG_nosave_free_bs	18	/* Free, should not be written */
+#define PG_uncached_bs		19	/* Page has been mapped as uncached */
 
 /*
  * Global page accounting.  One instance per CPU.  Only unsigned longs are
@@ -150,18 +149,17 @@ extern void get_full_page_state_bs(struct page_state_bs *ret);
 								&(page)->flags)
 
 #ifdef CONFIG_HIGHMEM_BS
-#define PageHighMem_bs(page)		test_bit(PG_highmem_bs, &(page)->flags)
-#define SetPageHighMem_bs(page)		__set_bit(PG_highmem_bs, \
-								&(page)->flags)
+#define PageHighMem_bs(page)		is_highmem_bs(page_zone_bs(page))
 #else
 #define PageHighMem_bs(page)		0 /* needed to optimize away at compile time */
 #endif
 
-#ifdef CONFIG_HUGETLB_PAGE_BS
-#define PageCompound_bs(page)		test_bit(PG_compound_bs, &(page)->flags)
-#else
-#define PageCompound_bs(page)		0
-#endif
+#define PageCompound_bs(page)		test_bit(PG_compound_bs, \
+								&(page)->flags)
+#define SetPageCompound_bs(page)	set_bit(PG_compound_bs, \
+								&(page)->flags)
+#define ClearPageCompound_bs(page)	clear_bit(PG_compound_bs, \
+								&(page)->flags)
 
 #define SetPageLRU_bs(page)		set_bit(PG_lru_bs, &(page)->flags)
 #define PageLRU_bs(page)		test_bit(PG_lru_bs, &(page)->flags)

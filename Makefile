@@ -68,6 +68,8 @@ ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
 ## CFlags
 ccflags-y		+= -DCONFIG_NODES_SHIFT=0
 ccflags-y		+= -DCONFIG_NR_CPUS_BS=8
+# Support DMA32
+ccflags-y		+= -DCONFIG_DMA32_BS
 # Support HighMem
 ccflags-y		+= -DCONFIG_HIGHMEM_BS
 # Support SLAB Debug

@@ -111,7 +111,7 @@ bootmem_initcall_bs(TestCase_bootmem_alloc_low_pages);
  */
 static int TestCase_bootmem_reserve(void)
 {
-#define MEM_START 0x70001000
+#define MEM_START 0x74000000
 	/* Reserved memory region */
 	reserve_bootmem_bs(MEM_START, 0x10);
 

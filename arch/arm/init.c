@@ -28,6 +28,7 @@
 #include "asm-generated/cacheflush.h"
 #include "asm-generated/mmzone.h"
 #include "asm-generated/vmalloc.h"
+#include "asm-generated/highmem.h"
 
 /* BiscuitOS Emulate */
 extern unsigned long _stext_bs, _etext_bs, __init_begin_bs, _text_bs;
@@ -36,7 +37,6 @@ extern unsigned long _end_bs, __init_end_bs, __data_start_bs;
 unsigned long phys_initrd_start_bs __initdata = 0;
 unsigned long phys_initrd_size_bs __initdata = 0;
 unsigned long initrd_start_bs, initrd_end_bs;
-extern struct meminfo highmeminfo_bs;
 extern void __init kmap_init_bs(void);
 extern void __init build_mem_type_table_bs(void);
 extern void __init create_mapping_bs(struct map_desc *md);
@@ -51,7 +51,7 @@ struct page_bs *empty_zero_page_bs;
  * The sole use of this is to pass memory configuration
  * data from paging_init to mem_init
  */
-static struct meminfo meminfo_bs __initdata = { 0, };
+struct meminfo meminfo_bs __initdata = { 0, };
 
 struct node_info {
 	unsigned int start;
@@ -144,28 +144,6 @@ static int __init check_initrd_bs(struct meminfo *mi)
 }
 
 /*
- * Register all available RAM in this node with the bootmem allocator.
- */
-static inline void free_bootmem_node_bank_bs(int node, struct meminfo *mi)
-{
-	pg_data_t_bs *pgdat = NODE_DATA_BS(node);
-	int bank;
-
-	for (bank = 0; bank < mi->nr_banks; bank++)
-		if (mi->bank[bank].node == node)
-			free_bootmem_node_bs(pgdat, mi->bank[bank].start,
-				mi->bank[bank].size);
-
-#ifdef CONFIG_HIGHMEM_BS
-	/* FIXME: Default ARM doesn't support HighMem Zone,
-	 * BiscuitOS support HighMem Zone
-	 */
-	free_bootmem_node_bs(pgdat, highmeminfo_bs.bank[0].start,
-					highmeminfo_bs.bank[0].size);
-#endif
-}
-
-/*
  * Reserve the various regions of node 0
  */
 static __init void reserve_node_zero_bs(pg_data_t_bs *pgdat)
@@ -228,11 +206,6 @@ bootmem_init_node_bs(int node, int initrd_node, struct meminfo *mi)
 	 */
 	if (end_pfn == 0)
 		return end_pfn;
-
-#ifdef CONFIG_HIGHMEM_BS
-	/* FIXME: BiscuitOS Supprot HighMem Zone */
-	end_pfn += PAGE_ALIGN_BS(highmeminfo_bs.bank[0].size) >> PAGE_SHIFT_BS;
-#endif
 
 	/*
 	 * Allocate the bootmem bitmap page.
@@ -307,7 +280,7 @@ bootmem_init_node_bs(int node, int initrd_node, struct meminfo *mi)
 
 #ifdef CONFIG_HIGHMEM_BS
 	/* FIXME: BiscuitOS Supprot HighMem Zone */
-	end_pfn -= PAGE_ALIGN_BS(highmeminfo_bs.bank[0].size) >> PAGE_SHIFT_BS;
+	end_pfn -= PAGE_ALIGN_BS(meminfo_bs.bank[1].size) >> PAGE_SHIFT_BS;
 #endif
 
 	return end_pfn;
@@ -386,6 +359,21 @@ static void __init bootmem_init_bs(struct meminfo *mi)
  */
 static void __init devicemaps_init_bs(struct machine_desc_bs *mdesc)
 {
+#ifdef CONFIG_HIGHMEM_BS
+	unsigned long addr;
+	struct meminfo *mi = &meminfo_bs;
+
+        /*
+         * Clear out all the kernel space mappings, except for the first
+         * memory bank, up to the end of the vmalloc region.
+         */
+        for (addr = __phys_to_virt_bs(mi->bank[0].start + mi->bank[0].size);
+             addr < __phys_to_virt_bs(mi->bank[1].start + mi->bank[1].size); 
+					addr += PGDIR_SIZE_BS) {
+                pmd_clear_bs(pmd_off_k_bs(addr));
+	}
+#endif
+
 }
 
 /*
@@ -520,13 +508,6 @@ void __init mem_init_bs(void)
 				meminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
 		printk(" %ldMB", meminfo_bs.bank[i].size >> 20);
 	}
-#ifdef CONFIG_HIGHMEM_BS
-	for (i = 0; i < highmeminfo_bs.nr_banks; i++) {
-		num_physpages_bs += 
-				highmeminfo_bs.bank[i].size >> PAGE_SHIFT_BS;
-		printk(" %ldMB", highmeminfo_bs.bank[i].size >> 20);
-	}
-#endif
 
 	printk(" = %luMB total\n", num_physpages_bs >> (20 - PAGE_SHIFT_BS));
 	printk(KERN_NOTICE "Memory: %luKB available (%dK code, "

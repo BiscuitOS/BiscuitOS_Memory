@@ -28,21 +28,7 @@
 struct page_bs *find_get_entry_bs(struct address_space *mapping, 
 							pgoff_t offset)
 {
-#ifdef CONFIG_BISCUITOS_5
-	struct page_bs *page_bs;
-	struct page *page = find_lock_page(mapping, offset);
-
-	if (page) {
-		/* allocate a page */
-		page_bs = alloc_page_bs(GFP_KERNEL_BS);
-		PAGE_TO_PAGE_BS(page, page_bs);
-	} else {
-		return NULL;
-	}
-	return page_bs;
-#else
 	;
-#endif
 }
 
 /**             

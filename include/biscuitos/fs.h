@@ -4,6 +4,9 @@
 #include <linux/radix-tree.h>
 #include "biscuitos/prio_tree.h"
 
+#define READ_BS		0
+#define WRITE_BS	1
+
 struct address_space_bs {
 	struct inode		*host;	/* owner: inode, block_device */
 	struct radix_tree_root	page_tree; /* radix tree of all pages */
@@ -24,5 +27,8 @@ struct address_space_bs {
 
 extern void __init vfs_caches_init_early_bs(void);
 extern void __init inode_init_early_bs(void);
+
+#define blk_congestion_wait_bs(x, y)	do { } while (0)
+#define TIF_MEMDIE_BS			18
 
 #endif

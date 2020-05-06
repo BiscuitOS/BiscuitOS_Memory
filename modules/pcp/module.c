@@ -41,7 +41,7 @@ static int TestCase_alloc_page_from_DMA_PCP(void)
 	printk("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
 	/* free all pages to PCP-hot */
-	free_page_bs((unsigned long)page);
+	free_page_bs((unsigned long)addr);
 
 	return 0;
 }
@@ -71,40 +71,7 @@ static int TestCase_alloc_page_from_normal_PCP(void)
 	printk("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
 
 	/* free all pages to PCP-hot */
-	free_page_bs((unsigned long)page);
-
-	return 0;
-}
-
-/*
- * TestCase: alloc page from HighMem Zone PCP
- */
-static int TestCase_alloc_page_from_highmem_PCP(void)
-{
-	struct page_bs *page;
-	void *addr;
-
-	/* allocate page from PCP (HighMem) */
-	page = alloc_page_bs(__GFP_HIGHMEM_BS);
-	if (!page) {
-		printk("%s alloc page failed\n", __func__);
-		return -ENOMEM;
-	}
-
-	if (!PageHighMem_bs(page))
-		printk("%s Page doesn't from HighMem Zone\n", __func__);
-
-	/* Obtain page virtual address */
-	addr = page_address_bs(page);
-	if (!addr) {
-		printk("%s Page doesn't mapping to virtual\n", __func__);
-	} else {
-		sprintf((char *)addr, "BiscuitOS-%s", __func__);
-		printk("[%#lx] %s\n", (unsigned long)addr, (char *)addr);
-	}
-
-	/* free pages to HighMem PCP-hot */
-	free_page_bs((unsigned long)page);
+	free_page_bs((unsigned long)addr);
 
 	return 0;
 }
@@ -114,7 +81,6 @@ static int __init PCP_Allocator_init(void)
 {
 	TestCase_alloc_page_from_DMA_PCP();
 	TestCase_alloc_page_from_normal_PCP();
-	TestCase_alloc_page_from_highmem_PCP();
 
 	return 0;
 }

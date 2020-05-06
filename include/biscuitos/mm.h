@@ -12,12 +12,6 @@
 #define VM_RESERVED_BS		0x00080000    /* Don't unmap it from swap_out */
 #define VM_ACCOUNT_BS		0x00100000    /* Is a VM accounted object */
 
-#ifdef ARCH_HAS_ATOMIC_UNSIGNED
-typedef unsigned page_flags_t_bs;
-#else
-typedef unsigned long page_flags_t_bs;
-#endif
-
 /*
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
@@ -52,7 +46,7 @@ typedef unsigned long page_flags_t_bs;
 #endif
 
 /* Page flags: | [SECTION] | [NODE] | ZONE | ... | FLAGS | */
-#define SECTIONS_PGOFF_BS	((sizeof(page_flags_t_bs)*8) - \
+#define SECTIONS_PGOFF_BS	((sizeof(unsigned long)*8) - \
 							SECTIONS_WIDTH_BS)
 #define NODES_PGOFF_BS		(SECTIONS_PGOFF_BS - NODES_WIDTH_BS)
 #define ZONES_PGOFF_BS		(NODES_PGOFF_BS - ZONES_WIDTH_BS)
@@ -102,20 +96,26 @@ struct address_space;
  * a page.
  */
 struct page_bs {
-	page_flags_t_bs flags;          /* Atomic flags, some possibly
+	unsigned long flags;          /* Atomic flags, some possibly
 					 * updated asynchronously */
 	atomic_t _count;                /* Usage count, see below. */
 	atomic_t _mapcount;             /* Count of ptes mapped in mms,
 					 * to show when page is mapped
 					 * & limit reverse map searches.
 					 */
-	unsigned long private;          /* Mapping-private opaque data:
+	union {
+		unsigned long private;   /* Mapping-private opaque data:
 					 * usually used for buffer_heads
 					 * if PagePrivate set; used for
 					 * swp_entry_t if PageSwapCache
 					 * When page is free, this indicates
 					 * order in the buddy system.
 					 */
+#if NR_CPUS_BS >= CONFIG_SPLIT_PTLOCK_CPUS
+		spinlock_t ptl;
+#endif
+	} u;
+
 	struct address_space *mapping; /* If low bit clear, points to
 					 * inode address_space, or NULL.
 					 * If page mapped as anonymous
@@ -165,6 +165,9 @@ struct shmem_page {
 	atomic_add_negative(-1, &(p)->_count);				\
 })
 
+#define page_private_bs(page)		((page)->u.private)
+#define set_page_private_bs(page, v)	((page)->u.private = (v))
+
 /*
  * Grab a ref, return true if the page previously had a logical refcount of
  * zero.  ie: returns true if we just grabbed an already-deemed-to-be-free page
@@ -174,11 +177,18 @@ struct shmem_page {
 #define set_page_count_bs(p,v)	atomic_set(&(p)->_count, v - 1)
 #define __put_page_bs(p)	atomic_dec(&(p)->_count)
 
-static inline int page_count_bs(struct page_bs *p)
+static inline int page_count_bs(struct page_bs *page)
 {
-	if (PageCompound_bs(p))
-		p = (struct page_bs *)p->private;
-	return atomic_read(&(p)->_count) + 1;
+	if (PageCompound_bs(page))
+		page = (struct page_bs *)page_private_bs(page);
+	return atomic_read(&page->_count) + 1;
+}
+
+static inline void get_page_bs(struct page_bs *page)
+{
+	if (unlikely(PageCompound_bs(page)))
+		page = (struct page_bs *)page_private_bs(page);
+	atomic_inc(&page->_count);
 }
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -300,9 +310,19 @@ extern void show_free_areas_bs(void);
 struct sysinfo_bs;
 extern void si_meminfo_bs(struct sysinfo_bs *);
 extern int __set_page_dirty_nobuffers_bs(struct page *page);
-extern void PAGE_TO_PAGE_BS(struct page *page, struct page_bs *page_bs);
-extern void PAGE_BS_TO_PAGE(struct page *page, struct page_bs *page_bs);
 extern void show_mem_bs(void);
 static inline void setup_per_cpu_pageset_bs(void) { }
+static inline unsigned zone_span_seqbegin_bs(struct zone_bs *zone)
+{
+	return 0;
+}
+static inline int zone_span_seqretry_bs(struct zone_bs *zone, unsigned iv)
+{
+	return 0;
+}
+static inline void zone_span_writelock_bs(struct zone_bs *zone) {}
+static inline void zone_span_writeunlock_bs(struct zone_bs *zone) {}
+static inline void zone_seqlock_init_bs(struct zone_bs *zone) {}
+static inline void pgdat_resize_init_bs(struct pglist_data_bs *pgdat) {}
 
 #endif

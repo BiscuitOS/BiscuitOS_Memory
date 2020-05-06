@@ -161,7 +161,7 @@ static int BiscuitOS_memory_probe(struct platform_device *pdev)
 		(unsigned long)BiscuitOS_dma_size + BiscuitOS_normal_size,
 		(unsigned long)BiscuitOS_ram_base);
 #else
-		"mem_bs=%#lx@%#lx highmem_bs=%#lx@%#lx", 
+		"mem_bs=%#lx@%#lx mem_bs=%#lx@%#lx", 
 		(unsigned long)BiscuitOS_dma_size + BiscuitOS_normal_size,
 		(unsigned long)BiscuitOS_ram_base,
 		(unsigned long)BiscuitOS_high_size,

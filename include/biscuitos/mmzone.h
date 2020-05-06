@@ -26,21 +26,11 @@
  * will be a maximum of 4 (2 ** 2) zonelists, for 3 modifiers there will
  * be 8 (2 ** 3) zonelists.  GFP_ZONETYPES defines the number of possible
  * combinations of zone modifiers in "zone modifier space".
+ *
+ * NOTE! Make sure this matches the zones in <linux/gfp.h>
  */
-#define GFP_ZONEMASK_BS		0x03
-/*
- * As an optimisation any zone modifier bits which are only valid when
- * no other zone modifier bits are set (loners) should be placed in
- * the highest order bits of this field.  This allows us to reduce the
- * extent of the zonelists thus saving space.  For example in the case
- * of three zone modifier bits, we could require up to eight zonelists.
- * If the left most zone modifier is a "loner" then the highest valid
- * zonelist would be four allowing us to allocate only five zonelists.
- * Use the first form when the left most bit is not a "loner", otherwise
- * use the second.
- */
-/* #define GFP_ZONETYPES        (GFP_ZONEMASK + 1) */		/* Non-loner */
-#define GFP_ZONETYPES_BS	((GFP_ZONEMASK_BS + 1) / 2 + 1)	/* Loner */
+#define GFP_ZONEMASK_BS		0x07
+#define GFP_ZONETYPES_BS	5
 
 #ifdef CONFIG_NUMA
 #define zone_pcp_bs(__z, __cpu) ((__z)->pageset[(__cpu)])
@@ -49,10 +39,11 @@
 #endif
 
 #define ZONE_DMA_BS		0
-#define ZONE_NORMAL_BS		1
-#define ZONE_HIGHMEM_BS		2
+#define ZONE_DMA32_BS		1
+#define ZONE_NORMAL_BS		2
+#define ZONE_HIGHMEM_BS		3
                 
-#define MAX_NR_ZONES_BS		3	/* Sync this with ZONES_SHIFT */
+#define MAX_NR_ZONES_BS		4	/* Sync this with ZONES_SHIFT */
 #define ZONES_SHIFT_BS		2	/* ceil(log2(MAX_NR_ZONES)) */
 
 /*              
@@ -105,11 +96,12 @@ struct per_cpu_pageset_bs {
 
 /*
  * On machines where it is needed (eg PCs) we divide physical memory
- * into multiple physical zones. On a PC we have 3 zones:
+ * into multiple physical zones. On a PC we have 4 zones:
  *
- * ZONE_DMA       < 16 MB       ISA DMA capable memory
- * ZONE_NORMAL  16-896 MB       direct mapped by the kernel
- * ZONE_HIGHMEM  > 896 MB       only page cache and user processes
+ * ZONE_DMA	  < 16 MB	ISA DMA capable memory
+ * ZONE_DMA32	     0 MB 	Empty
+ * ZONE_NORMAL	16-896 MB	direct mapped by the kernel
+ * ZONE_HIGHMEM	 > 896 MB	only page cache and user processes
  */
 
 struct zone_bs {
@@ -217,9 +209,18 @@ struct zone_bs {
 	struct page_bs		*zone_mem_map;
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
 	unsigned long		zone_start_pfn;
-	/* total size, including holes */
+
+	/*
+	 * zone_start_pfn, spanned_pages and present_pages are all
+	 * protected by span_seqlock.  It is a seqlock because it has
+	 * to be read outside of zone->lock, and it is done in the main
+	 * allocator path.  But, it is written quite infrequently.
+	 *
+	 * The lock is declared along with zone->lock because it is
+	 * frequently read in proximity to zone->lock.  It's good to
+	 * give them a chance of being in the same cacheline.
+	 */
 	unsigned long		spanned_pages;
-	/* amount of memory (excluding holes) */
 	unsigned long		present_pages;
 
 	/*
@@ -280,12 +281,12 @@ extern struct pglist_data_bs *pgdat_list_bs;
 #endif
 #define nid_page_nr_bs(nid, pagenr) 	pgdat_page_nr_bs(NODE_DATA_BS(nid),(pagenr))
 
-#if BITS_PER_LONG_BS == 32 || defined(ARCH_HAS_ATOMIC_UNSIGNED)
+#if BITS_PER_LONG_BS == 32
 /*
- * with 32 bit page->flags field, we reserve 8 bits for node/zone info.
- * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.
+ * with 32 bit page->flags field, we reserve 9 bits for node/zone info.
+ * there are 4 zones (3 bits) and this leaves 9-3=6 bits for nodes.
  */
-#define FLAGS_RESERVED_BS	8
+#define FLAGS_RESERVED_BS	9
 
 #elif BITS_PER_LONG_BS == 64
 /*
@@ -402,7 +403,7 @@ static inline struct zone_bs *next_zone_bs(struct zone_bs *zone)
 #define numa_node_id_bs()	(0)
 
 extern int zone_watermark_ok_bs(struct zone_bs *z, int order, 
-  unsigned long mark, int classzone_idx, int can_try_harder, int gfp_high);
+  unsigned long mark, int classzone_idx, int alloc_flags);
 extern void wakeup_kswapd_bs(struct zone_bs *zone, int order);
 #define sparse_init_bs()	do {} while (0)
 #define sparse_index_init_bs(_sec, _nid)  do {} while (0)

@@ -416,7 +416,7 @@ static int balance_pgdat_bs(pg_data_t_bs *pgdat, int nr_pages, int order)
 					continue;
 
 				if (!zone_watermark_ok_bs(zone, order,
-						zone->pages_high, 0, 0, 0)) {
+						zone->pages_high, 0, 0)) {
 					end_zone = i;
 					goto scan;
 				}
@@ -453,7 +453,7 @@ scan:
 
 			if (nr_pages == 0) { /* Not software suspend */
 				if (!zone_watermark_ok_bs(zone, order,
-					zone->pages_high, end_zone, 0, 0))
+					zone->pages_high, end_zone, 0))
 					all_zones_ok = 0;
 			}
 			zone->temp_priority = priority;
@@ -562,7 +562,7 @@ void wakeup_kswapd_bs(struct zone_bs *zone, int order)
 		return;
 
 	pgdat = zone->zone_pgdat;
-	if (zone_watermark_ok_bs(zone, order, zone->pages_low, 0, 0, 0))
+	if (zone_watermark_ok_bs(zone, order, zone->pages_low, 0, 0))
 		return;
 	if (pgdat->kswapd_max_order < order)
 		pgdat->kswapd_max_order = order;

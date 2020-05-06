@@ -576,21 +576,6 @@ void __init create_mapping_bs(struct map_desc *md)
 
 void arch_free_page_bs(struct page_bs *page, int order)
 {
-#ifdef CONFIG_HIGHMEM_BS
-	/* FIXME: Default ARM doesn't support HighMem Zone,
-	 * BiscuitOS support it. */
-	struct zone_bs *zone = page_zone_bs(page);
-
-	if (strcmp(zone->name, "HighMem") == 0) {
-		struct page_bs *tmp;
-		int idx;
-
-		for (idx = 0; idx < (1 << order); idx++) {
-			tmp = page + idx;
-			SetPageHighMem_bs(tmp);
-		}
-	}
-#endif
 }
 
 static pte_t_bs *__init early_pte_alloc_bs(pmd_t_bs *pmd, unsigned long addr,
@@ -611,6 +596,7 @@ pte_t_bs *kmap_pte_bs;
 
 void __init kmap_init_bs(void)
 {
+
 	/* PKMAP */
 	pkmap_page_table_bs = early_pte_alloc_bs(pmd_off_k_bs(PKMAP_BASE_BS),
 				PKMAP_BASE_BS, _PAGE_KERNEL_TABLE_BS);

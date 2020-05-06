@@ -22,6 +22,7 @@
 static int TestCase_alloc_pages(void)
 {
 	struct page_bs *pages;
+	void *addr;
 	int order = 1;
 
 	/* Alloc pages */
@@ -32,9 +33,10 @@ static int TestCase_alloc_pages(void)
 	}
 	printk("TestCase0: Page from Normal Zone, PFN %#lx\n", 
 						page_to_pfn_bs(pages));
+	addr = page_address_bs(page);
 
 	/* Free pages */
-	free_pages_bs(pages, order);
+	free_pages_bs((unsigned long)addr, order);
 }
 
 /*
@@ -43,6 +45,7 @@ static int TestCase_alloc_pages(void)
 static int TestCase_alloc_pages_DMA(void)
 {
 	struct page_bs *pages;
+	void *addr;
 	int order = 1;
 
 	/* Alloc pages */
@@ -53,9 +56,10 @@ static int TestCase_alloc_pages_DMA(void)
 	}
 	printk("TestCase1: Page from DMA Zone, PFN %#lx\n",
 						page_to_pfn_bs(pages));
+	addr = page_address_bs(page);
 
 	/* Free pages */
-	free_pages_bs(pages, order);
+	free_pages_bs((unsigned long)addr, order);
 
 	return 0;
 }
