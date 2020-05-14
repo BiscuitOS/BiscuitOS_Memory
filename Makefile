@@ -22,19 +22,18 @@ ARCH_MM			:= arm
 ## Source Code
 $(MODULE_NAME)-m	:= main.o
 $(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/mm/*.c))
-$(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/$(ARCH_MM)/*.c)) 
+$(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/init/*.c))
+$(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.c,%.o, $(wildcard $(PWD)/arch/*.c)) 
+$(MODULE_NAME)-m	+= $(patsubst $(PWD)/%.S,%.o, $(wildcard $(PWD)/arch/*.S)) 
 
+# LD-scripts
+# ldflags-y		+= -r -T $(PWD)/BiscuitOS.lds
 ## CFlags
-ccflags-y		+= -DCONFIG_NODES_SHIFT=2
-# PAGE_OFFSET
-ccflags-y		+= -DCONFIG_PAGE_OFFSET_BS=0x90000000
-# PHYS_OFFSET
-ccflags-y		+= -DCONFIG_PHYS_OFFSET_BS=0x70000000
-# CMDLINE
-ccflags-y		+= -DCONFIG_CMDLINE_BS="\"mem_bs=0x4000000@0x70000000\""
+asflags-y		:= -I$(PWD)/arch/$(ARCH_MM)/include
+asflags-y		+= -I$(PWD)/include
 
 ## Header
-ccflags-y		+= -I$(PWD)/arch/$(ARCH_MM)/include
+ccflags-y		+= -I$(PWD)/arch/include
 ccflags-y		+= -I$(PWD)/include
 
 else
@@ -101,6 +100,7 @@ install:
 clean:
 	@rm -rf *.ko *.o *.mod.o *.mod.c *.symvers *.order \
                .*.o.cmd .tmp_versions *.ko.cmd .*.ko.cmd \
-		src/*.o mm/*.o
+		mm/*.o arch/*.o mm/.*.o.*  \
+		arch/.*.o.* init/*.o 
 
 endif
