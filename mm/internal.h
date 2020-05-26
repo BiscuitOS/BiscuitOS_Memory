@@ -11,3 +11,5 @@
 
 /* page_alloc.c */
 extern void set_page_refs_bs(struct page_bs *page, int order);
+extern void fastcall_bs __init
+__free_pages_bootmem_bs(struct page_bs *page, unsigned int order);

@@ -300,20 +300,12 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 		unsigned long v = ~map[i / BITS_PER_LONG_BS];
 
 		if (gofast && v == ~0UL) {
-			int j, order;
+			int order;
 
 			page = pfn_to_page_bs(pfn);
 			count += BITS_PER_LONG_BS;
-			__ClearPageReserved_bs(page);
 			order = ffs(BITS_PER_LONG_BS) - 1;
-			set_page_refs_bs(page, order);
-			for (j = 1; j < BITS_PER_LONG_BS; j++) {
-				if (j + 16 < BITS_PER_LONG_BS)
-					prefetchw(page + j + 16);
-				__ClearPageReserved_bs(page + j);
-				set_page_count_bs(page + j, 0);
-			}
-			__free_pages_bs(page, order);
+			__free_pages_bootmem_bs(page, order);
 			i += BITS_PER_LONG_BS;
 			page += BITS_PER_LONG_BS;
 		} else if (v) {
@@ -323,9 +315,7 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 			for (m = 1; m && i < idx; m <<= 1, page++, i++) {
 				if (v & m) {
 					count++;
-					__ClearPageReserved_bs(page);
-					set_page_refs_bs(page, 0);
-					__free_page_bs(page);
+					__free_pages_bootmem_bs(page, 0);
 				}
 			}
 		} else {
@@ -345,9 +335,7 @@ static unsigned long __init free_all_bootmem_core_bs(pg_data_t_bs *pgdat)
 			PAGE_SHIFT_BS))/8 + PAGE_SIZE_BS-1)/PAGE_SIZE_BS;
 						i++,page++) {
 		count++;
-		__ClearPageReserved_bs(page);
-		set_page_count_bs(page, 1);
-		__free_page_bs(page);
+		__free_pages_bootmem_bs(page, 0);
 	}
 	total += count;
 	bdata->node_bootmem_map = NULL;
@@ -374,15 +362,15 @@ void __init reserve_bootmem_node_bs(pg_data_t_bs *pgdat, unsigned long physaddr,
 	reserve_bootmem_core_bs(pgdat->bdata, physaddr, size);
 }
 
-void * __init __alloc_bootmem_limit_bs(unsigned long size, unsigned long align,
-		unsigned long goal, unsigned long limit)
+void * __init __alloc_bootmem_bs(unsigned long size, unsigned long align,
+		unsigned long goal)
 {
 	pg_data_t_bs *pgdat = pgdat_list_bs;
 	void *ptr;
 
 	for_each_pgdat_bs(pgdat)
 		if ((ptr = __alloc_bootmem_core_bs(pgdat->bdata, 
-						size, align, goal, limit)))
+						size, align, goal, 0)))
 			return (ptr);
 	/*
 	 * Whoops, we cannot satisfy the allocation request.
@@ -392,17 +380,16 @@ void * __init __alloc_bootmem_limit_bs(unsigned long size, unsigned long align,
 	return NULL;
 }
 
-void *__init __alloc_bootmem_node_limit_bs(pg_data_t_bs *pgdat, 
-	unsigned long size, unsigned long align, unsigned long goal,
-	unsigned long limit)
+void *__init __alloc_bootmem_node_bs(pg_data_t_bs *pgdat, 
+	unsigned long size, unsigned long align, unsigned long goal)
 {
 	void *ptr;
 
-	ptr = __alloc_bootmem_core_bs(pgdat->bdata, size, align, goal, limit);
+	ptr = __alloc_bootmem_core_bs(pgdat->bdata, size, align, goal, 0);
 	if (ptr)
 		return (ptr);
 
-	return __alloc_bootmem_limit_bs(size, align, goal, limit);
+	return __alloc_bootmem_bs(size, align, goal);
 }
 
 unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat)
@@ -416,3 +403,31 @@ void __init reserve_bootmem_bs(unsigned long addr, unsigned long size)
 	reserve_bootmem_core_bs(NODE_DATA_BS(0)->bdata, addr, size);
 }
 #endif
+
+#define LOW32LIMIT_BS	0xffffffff
+
+void * __init __alloc_bootmem_low_bs(unsigned long size, 
+				unsigned long align, unsigned long goal)
+{
+	pg_data_t_bs *pgdat = pgdat_list_bs;
+	void *ptr;
+
+	for_each_pgdat_bs(pgdat)
+		if ((ptr = __alloc_bootmem_core_bs(pgdat->bdata, size,
+						 align, goal, LOW32LIMIT_BS)))
+			return(ptr);
+
+	/*
+	 * Whoops, we cannot satisfy the allocation request.
+	 */
+	printk(KERN_ALERT "low bootmem alloc of %lu bytes failed!\n", size);
+	panic("Out of low memory");
+	return NULL;
+}
+
+void * __init __alloc_bootmem_low_node_bs(pg_data_t_bs *pgdat, 
+		unsigned long size, unsigned long align, unsigned long goal)
+{
+	return __alloc_bootmem_core_bs(pgdat->bdata, size, align, 
+							goal, LOW32LIMIT_BS);
+}

@@ -1572,6 +1572,40 @@ got_pg:
 }
 EXPORT_SYMBOL_GPL(__alloc_pages_bs);
 
+/*
+ * permit the bootmem allocator to evade page validation on high-order frees
+ */
+void fastcall_bs __init 
+__free_pages_bootmem_bs(struct page_bs *page, unsigned int order)
+{
+	if (order == 0) {
+		__ClearPageReserved_bs(page);
+		set_page_count_bs(page, 0);
+
+		free_hot_cold_page_bs(page, 0);
+	} else {
+		LIST_HEAD(list);
+		int loop;
+
+		for (loop = 0; loop < BITS_PER_LONG_BS; loop++) {
+			struct page_bs *p = &page[loop];
+
+			if (loop + 16 < BITS_PER_LONG_BS)
+				prefetchw(p + 16);
+			__ClearPageReserved_bs(p);
+			set_page_count_bs(p, 0);
+		}
+
+		arch_free_page_bs(page, order);
+
+		mod_page_state_bs(pgfree, 1 << order);
+
+		list_add(&page->lru, &list);
+		kernel_map_pages_bs(page, 1 << order, 0);
+		free_pages_bulk_bs(page_zone_bs(page), 1, &list, order);
+	}
+}
+
 fastcall_bs unsigned long get_zeroed_page_bs(gfp_t_bs __nocast gfp_mask)
 {
 	struct page_bs *page;

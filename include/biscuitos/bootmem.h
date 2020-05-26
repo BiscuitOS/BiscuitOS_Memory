@@ -38,10 +38,17 @@ extern void __init free_bootmem_node_bs(pg_data_t_bs *,
 					unsigned long, unsigned long);
 extern void __init reserve_bootmem_node_bs(pg_data_t_bs *, unsigned long,
 					unsigned long);
-extern void * __init __alloc_bootmem_limit_bs(unsigned long, 
-				unsigned long, unsigned long, unsigned long);
-extern void * __init __alloc_bootmem_node_limit_bs(pg_data_t_bs *, 
-	unsigned long, unsigned long, unsigned long, unsigned long);
+extern void * __init __alloc_bootmem_bs(unsigned long, 
+				unsigned long, unsigned long);
+extern void * __init __alloc_bootmem_node_bs(pg_data_t_bs *, 
+	unsigned long, unsigned long, unsigned long);
+extern void * __init __alloc_bootmem_low_bs(unsigned long size,
+					 unsigned long align,
+					 unsigned long goal);
+extern void * __init __alloc_bootmem_low_node_bs(pg_data_t_bs *pgdat,
+					      unsigned long size,
+					      unsigned long align,
+					      unsigned long goal);
 
 #ifndef CONFIG_HAVE_ARCH_BOOTMEM_NODE
 extern void __init reserve_bootmem_bs(unsigned long addr, unsigned long size);
@@ -51,36 +58,20 @@ extern void __init reserve_bootmem_bs(unsigned long addr, unsigned long size);
 	__alloc_bootmem_bs((x), SMP_CACHE_BYTES_BS,			\
 					__pa_bs(MAX_DMA_ADDRESS_BS))
 #define alloc_bootmem_low_bs(x)						\
-	__alloc_bootmem_bs((x), SMP_CACHE_BYTES_BS, 0)
+	__alloc_bootmem_low_bs((x), SMP_CACHE_BYTES_BS, 0)
 
 #define alloc_bootmem_node_bs(pgdat, x)					\
 	__alloc_bootmem_node_bs((pgdat), (x), SMP_CACHE_BYTES_BS,	\
 					__pa_bs(MAX_DMA_ADDRESS_BS))
 #define alloc_bootmem_low_pages_bs(x)					\
-	__alloc_bootmem_bs((x), PAGE_SIZE_BS, 0)
+	__alloc_bootmem_low_bs((x), PAGE_SIZE_BS, 0)
 
 #define alloc_bootmem_pages_bs(x)					\
 	__alloc_bootmem_bs((x), PAGE_SIZE, __pa_bs(MAX_DMA_ADDRESS_BS))
 
-#define alloc_bootmem_limit_bs(x, limit)				\
-	__alloc_bootmem_limit_bs((x), SMP_CACHE_BYTES_BS, 		\
-				__pa_bs(MAX_DMA_ADDRESS_BS), (limit))
-#define alloc_bootmem_low_limit_bs(x, limit)				\
-	__alloc_bootmem_limit_bs((x), SMP_CACHE_BYTES_BS, 0, (limit))
-#define alloc_bootmem_pages_limit_bs(x, limit)				\
-	__alloc_bootmem_limit_bs((x), PAGE_SIZE_BS, 			\
-				__pa_bs(MAX_DMA_ADDRESS_BS), (limit))
-#define alloc_bootmem_low_pages_limit_bs(x, limit)			\
-	__alloc_bootmem_limit_bs((x), PAGE_SIZE_BS, 0, (limit))
+#define alloc_bootmem_low_pages_node_bs(pgdat, x)			\
+	__alloc_bootmem_low_node_bs((pgdat), (x), PAGE_SIZE_BS, 0)
 
-#define alloc_bootmem_node_limit_bs(pgdat, x, limit)			\
-	__alloc_bootmem_node_limit_bs((pgdat), (x), SMP_CACHE_BYTES_BS,	\
-				 __pa_bs(MAX_DMA_ADDRESS_BS), (limit))
-#define alloc_bootmem_pages_node_limit_bs(pgdat, x, limit)		\
-	__alloc_bootmem_node_limit_bs((pgdat), (x), PAGE_SIZE_BS, 	\
-				__pa_bs(MAX_DMA_ADDRESS_BS), (limit))
-#define alloc_bootmem_low_pages_node_limit_bs(pgdat, x, limit)		\
-	__alloc_bootmem_node_limit_bs((pgdat), (x), PAGE_SIZE_BS, 0, (limit))
 
 extern unsigned long __init free_all_bootmem_node_bs(pg_data_t_bs *pgdat);
 extern void __init free_bootmem_bs(unsigned long addr, unsigned long size);
@@ -109,18 +100,6 @@ extern int __initdata hashdist_bs; /* Distribute hashes across NUMA nodes? */
 static inline void *alloc_remap_bs(int nid, unsigned long size)
 {
 	return NULL;
-}
-
-static inline void *__alloc_bootmem_bs(unsigned long size, 
-				unsigned long align, unsigned long goal)
-{
-	return __alloc_bootmem_limit_bs(size, align, goal, 0);
-}
-
-static inline void *__alloc_bootmem_node_bs(pg_data_t_bs *pgdat, 
-		unsigned long size, unsigned long align, unsigned long goal)
-{
-	return __alloc_bootmem_node_limit_bs(pgdat, size, align, goal, 0);
 }
 
 #endif
