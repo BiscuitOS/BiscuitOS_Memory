@@ -104,25 +104,27 @@ struct page_bs {
 					 * & limit reverse map searches.
 					 */
 	union {
-		unsigned long private;   /* Mapping-private opaque data:
-					 * usually used for buffer_heads
-					 * if PagePrivate set; used for
-					 * swp_entry_t if PageSwapCache
-					 * When page is free, this indicates
-					 * order in the buddy system.
-					 */
-#if NR_CPUS_BS >= CONFIG_SPLIT_PTLOCK_CPUS
-		spinlock_t ptl;
+	    struct {
+		unsigned long private;		/* Mapping-private opaque data:
+					 	 * usually used for buffer_heads
+						 * if PagePrivate set; used for
+						 * swp_entry_t if PageSwapCache.
+						 * When page is free, this
+						 * indicates order in the buddy
+						 * system.
+						 */
+		struct address_space *mapping;	/* If low bit clear, points to
+						 * inode address_space, or NULL.
+						 * If page mapped as anonymous
+						 * memory, low bit is set, and
+						 * it points to anon_vma object:
+						 * see PAGE_MAPPING_ANON below.
+						 */
+	    };
+#if NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS
+	    spinlock_t ptl;
 #endif
-	} u;
-
-	struct address_space *mapping; /* If low bit clear, points to
-					 * inode address_space, or NULL.
-					 * If page mapped as anonymous
-					 * memory, low bit is set, and
-					 * it points to anon_vma object:
-					 * see PAGE_MAPPING_ANON below.
-					 */
+	};
 	pgoff_t index;                  /* Our offset within mapping. */
 	struct list_head lru;           /* Pageout list, eg. active_list
 					 * protected by zone->lru_lock !
@@ -165,8 +167,8 @@ struct shmem_page {
 	atomic_add_negative(-1, &(p)->_count);				\
 })
 
-#define page_private_bs(page)		((page)->u.private)
-#define set_page_private_bs(page, v)	((page)->u.private = (v))
+#define page_private_bs(page)		((page)->private)
+#define set_page_private_bs(page, v)	((page)->private = (v))
 
 /*
  * Grab a ref, return true if the page previously had a logical refcount of
@@ -174,7 +176,7 @@ struct shmem_page {
  */
 #define get_page_testone_bs(p)	atomic_inc_and_test(&(p)->_count)
 
-#define set_page_count_bs(p,v)	atomic_set(&(p)->_count, v - 1)
+#define set_page_count_bs(p,v)	atomic_set(&(p)->_count, (v) - 1)
 #define __put_page_bs(p)	atomic_dec(&(p)->_count)
 
 static inline int page_count_bs(struct page_bs *page)
@@ -223,8 +225,6 @@ static inline void set_page_links_bs(struct page_bs *page,
 	set_page_node_bs(page, node);
 	set_page_section_bs(page, pfn_to_section_nr_bs(pfn));
 }
-
-#define set_page_count_bs(p, v)		atomic_set(&(p)->_count, v - 1)
 
 /*      
  * The atomic page->_mapcount, like _count, starts from -1:

@@ -25,4 +25,6 @@ extern void FASTCALL_BS(kunmap_high_bs(struct page_bs *page));
 extern void *kmap_bs(struct page_bs *page);
 extern void kunmap_bs(struct page_bs *page);
 
+static inline void check_highest_zone_bs(int k) {}
+
 #endif

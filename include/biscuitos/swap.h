@@ -51,12 +51,14 @@ typedef struct {
 
 #define swap_token_default_timeout_bs		0
 #define has_swap_token_bs(x)			0
+#define zone_reclaim_mode_bs			0
 
 extern unsigned long totalram_pages_bs;
 extern unsigned long totalhigh_pages_bs;
 
 extern unsigned int nr_free_pages_bs(void);
-extern void out_of_memory_bs(unsigned int __nocast gfp_mask, int order);
+struct zonelist_bs;
+extern void out_of_memory_bs(struct zonelist_bs *, unsigned int __nocast, int order);
 extern void __init swap_setup_bs(void);
 struct zone_bs;
 extern int try_to_free_pages_bs(struct zone_bs **zones, unsigned int gfp_mask);

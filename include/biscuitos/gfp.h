@@ -54,6 +54,7 @@
 				 __GFP_NO_GROW_BS | __GFP_COMP_BS | \
 				 __GFP_NOMEMALLOC_BS | __GFP_HARDWALL_BS)
 
+/* GFP_ATOMIC means both !wait (__GFP_WAIT not set) and use emergency pool */
 #define GFP_ATOMIC_BS		(__GFP_HIGH_BS)
 #define GFP_NOIO_BS		(__GFP_WAIT_BS)
 #define GFP_NOFS_BS		(__GFP_WAIT_BS | __GFP_IO_BS)
@@ -94,6 +95,10 @@ static inline struct page_bs *alloc_pages_node_bs(int nid,
 {
 	if (unlikely(order >= MAX_ORDER_BS))
 		return NULL;
+
+	/* Unknow node is current node */
+	if (nid < 0)
+		nid = numa_node_id_bs();
 
 	return __alloc_pages_bs(gfp_mask, order,
 			NODE_DATA_BS(nid)->node_zonelists +

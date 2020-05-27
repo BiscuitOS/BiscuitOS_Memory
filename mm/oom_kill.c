@@ -17,6 +17,8 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include "biscuitos/mmzone.h"
+#include "biscuitos/gfp.h"
 
 /**
  * oom_kill - kill the "best" process when we run out of memory
@@ -26,7 +28,8 @@
  * OR try to be smart about which process to kill. Note that we
  * don't have to be perfect here, we just have to be good.
  */
-void out_of_memory_bs(unsigned int __nocast gfp_mask, int order)
+void out_of_memory_bs(struct zonelist_bs *zonelist, 
+				gfp_t_bs gfp_mask, int order)
 {
 }
 

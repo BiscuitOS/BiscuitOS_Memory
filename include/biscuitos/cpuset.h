@@ -8,4 +8,6 @@ static inline int cpuset_zone_allowed_bs(struct zone_bs *z, gfp_t_bs gfp_mask)
 	return 1;
 }
 
+static inline void cpuset_memory_pressure_bump_bs(void) {}
+
 #endif
