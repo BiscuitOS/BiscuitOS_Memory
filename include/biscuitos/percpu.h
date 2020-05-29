@@ -31,14 +31,14 @@ struct percpu_data_bs {
 	(__typeof__(ptr))__p->ptrs[(cpu)];				\
 })
 
-extern void *__alloc_percpu_bs(size_t size, size_t align);
+extern void *__alloc_percpu_bs(size_t size);
 extern void free_percpu_bs(const void *);
 
 #else /* CONFIG_SMP */
 
 #define per_cpu_ptr_bs(ptr, cpu) (ptr)
 
-static inline void *__alloc_percpu_bs(size_t size, size_t align)
+static inline void *__alloc_percpu_bs(size_t size)
 {
 	void *ret = kmalloc_bs(size, GFP_KERNEL_BS);
 	if (ret)
@@ -54,6 +54,6 @@ static inline void free_percpu_bs(const void *ptr)
 
 /* Simple wrapper for the common case: zeros memory. */
 #define alloc_percpu_bs(type) \
-	((type *)(__alloc_percpu_bs(sizeof(type), __alignof__(type))))
+	((type *)(__alloc_percpu_bs(sizeof(type))))
 
 #endif

@@ -6,6 +6,7 @@ typedef struct kmem_cache_bs kmem_cache_t_bs;
 #include <linux/compiler.h>
 #include "biscuitos/gfp.h"
 #include "biscuitos/types.h"
+#include "asm-generated/page.h"
 
 /* flags for kmem_cache_alloc() */
 #define SLAB_NOFS_BS		GFP_NOFS_BS
@@ -42,6 +43,7 @@ typedef struct kmem_cache_bs kmem_cache_t_bs;
 #define SLAB_CTOR_ATOMIC_BS		0x002UL	/* tell constructor it can't sleep */
 #define SLAB_CTOR_VERIFY_BS		0x004UL	/* tell constructor it's a verify call */
 
+#ifndef CONFIG_SLOB_BS
 /* Size description struct for general caches. */
 struct cache_sizes_bs {
 	size_t		cs_size;
@@ -55,7 +57,15 @@ void *kmem_cache_alloc_bs(kmem_cache_t_bs *, gfp_t_bs);
 void kmem_cache_free_bs(kmem_cache_t_bs *cachep, void *objp);
 kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, gfp_t_bs gfpflags);
 extern struct cache_sizes_bs malloc_sizes_bs[];
+
+#ifndef CONFIG_DEBUG_SLAB
 extern void *__kmalloc_bs(size_t, gfp_t_bs);
+#else
+extern void *__kmalloc_track_caller_bs(size_t, gfp_t_bs, void*);
+#define __kmalloc_bs(size, flags) \
+    __kmalloc_track_caller_bs(size, flags, __builtin_return_address(0))
+#endif
+
 void kfree_bs(const void *objp);
 kmem_cache_t_bs *
 kmem_cache_create_bs(const char *name, size_t size, size_t align,
@@ -110,4 +120,11 @@ static inline void *kmem_cache_alloc_node_bs(kmem_cache_t_bs *cachep,
 }
 
 extern int FASTCALL_BS(kmem_ptr_validate_bs(kmem_cache_t_bs *, void *));
+#else /* CONFIG_SLOB_BS */
+
+/* SLOB allocator routines */
+
+#define kmem_cache_shrink_bs(d) (0)
+
+#endif
 #endif
