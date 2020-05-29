@@ -29,6 +29,7 @@ DEBUG_DATA_T(percpu);
 DEBUG_DATA_T(buddy);
 DEBUG_DATA_T(pcp);
 DEBUG_DATA_T(slab);
+DEBUG_DATA_T(slob);
 DEBUG_DATA_T(vmalloc);
 DEBUG_DATA_T(module);
 DEBUG_DATA_T(kmap);
@@ -64,6 +65,11 @@ DEBUG_DATA_T(login);
 	static slab_entry_t_bs __slab_entry_##fn			\
 	__attribute__((__used__))					\
 	__attribute__((__section__(".slab_data_bs"))) = fn
+
+#define slob_initcall_bs(fn)						\
+	static slob_entry_t_bs __slob_entry_##fn			\
+	__attribute__((__used__))					\
+	__attribute__((__section__(".slob_data_bs"))) = fn
 
 #define vmalloc_initcall_bs(fn)						\
 	static vmalloc_entry_t_bs __vmalloc_entry_##fn			\

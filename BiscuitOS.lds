@@ -65,6 +65,14 @@ SECTIONS {
 	}
 
 	. = ALIGN(16);
+	/* Slob */
+	.slob_bs : {
+		slob_section_start_bs = .;
+			*(.slob_data_bs)
+		slob_section_end_bs = .;
+	}
+
+	. = ALIGN(16);
 	/* Vmalloc */
 	.vmalloc_bs : {
 		vmalloc_section_start_bs = .;

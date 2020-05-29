@@ -44,15 +44,19 @@ $(MODULE_NAME)-m		+= modules/pcp/main.o
 # obj-m				+= $(MODULE_NAME)-slab.o
 # $(MODULE_NAME)-slab-m		:= modules/slab/module.o
 $(MODULE_NAME)-m		+= modules/slab/main.o
-#  6) VMALLOC
+#  6) Slob
+# obj-m				+= $(MODULE_NAME)-slob.o
+# $(MODULE_NAME)-slob-m		:= modules/slob/module.o
+$(MODULE_NAME)-m		+= modules/slob/main.o
+#  7) VMALLOC
 # obj-m				+= $(MODULE_NAME)-vmalloc.o
 # $(MODULE_NAME)-vmalloc-m	:= modules/vmalloc/module.o
 $(MODULE_NAME)-m		+= modules/vmalloc/main.o
-#  7) kmap
+#  8) kmap
 # obj-m				+= $(MODULE_NAME)-kmap.o
 # $(MODULE_NAME)-kmap-m		:= modules/kmap/module.o
 $(MODULE_NAME)-m		+= modules/kmap/main.o
-#  8) fixmap
+#  9) fixmap
 $(MODULE_NAME)-m		+= modules/fixmap/main.o
 
 ## Memory Usage
@@ -74,6 +78,8 @@ ccflags-y		+= -DCONFIG_DMA32_BS
 ccflags-y		+= -DCONFIG_HIGHMEM_BS
 # Support SLAB Debug
 # ccflags-y		+= -DCONFIG_DEBUG_SLAB_BS
+# Support SLOB
+ccflags-y		+= -DCONFIG_SLOB_BS
 # Support TMPFS
 ccflags-y		+= -DCONFIG_TMPFS_BS
 ccflags-y		+= -DCONFIG_TMPFS_XATTR_BS
@@ -157,6 +163,7 @@ clean:
 		modules/buddy/.*.cmd modules/bootmem/*.o \
 		modules/bootmem/.*.cmd \
 		modules/slab/.*.cmd modules/slab/*.o \
+		modules/slob/.*.cmd modules/slob/*.o \
 		modules/pcp/.*.cmd modules/pcp/*.o \
 		modules/percpu/.*.cmd modules/percpu/*.o \
 		modules/kmap/.*.cmd modules/kmap/*.o \

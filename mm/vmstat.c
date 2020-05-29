@@ -15,7 +15,9 @@ static int __init init_mm_internals_bs(void)
 #ifdef CONFIG_PROC_FS
 	proc_create_seq("vmstat_bs", 0444, NULL, &vmstat_op_bs);
 	proc_create_seq("buddyinfo_bs", 0444, NULL, &fragmentation_op_bs);
+#ifndef CONFIG_SLOB_BS
 	proc_create_seq("slabinfo_bs", 0444, NULL, &slabinfo_op_bs);
+#endif
 	proc_create_seq("zoneinfo_bs", 0444, NULL, &zoneinfo_op_bs);
 #endif
 	return 0;

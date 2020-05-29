@@ -1,3 +1,4 @@
+#ifndef CONFIG_SLOB_BS
 /*
  * linux/mm/slab.c
  * Written by Mark Hemment, 1996/97.
@@ -3517,3 +3518,4 @@ fail:
 	err = -ENOMEM;
 	return err;
 }
+#endif

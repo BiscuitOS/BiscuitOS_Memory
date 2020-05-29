@@ -44,6 +44,7 @@ typedef struct kmem_cache_bs kmem_cache_t_bs;
 #define SLAB_CTOR_VERIFY_BS		0x004UL	/* tell constructor it's a verify call */
 
 #ifndef CONFIG_SLOB_BS
+
 /* Size description struct for general caches. */
 struct cache_sizes_bs {
 	size_t		cs_size;
@@ -51,12 +52,17 @@ struct cache_sizes_bs {
 	kmem_cache_t_bs	*cs_dmacachep;
 };
 
-extern void __init kmem_cache_init_bs(void);
-
-void *kmem_cache_alloc_bs(kmem_cache_t_bs *, gfp_t_bs);
 void kmem_cache_free_bs(kmem_cache_t_bs *cachep, void *objp);
 kmem_cache_t_bs *kmem_find_general_cachep_bs(size_t size, gfp_t_bs gfpflags);
 extern struct cache_sizes_bs malloc_sizes_bs[];
+extern void __init kmem_cache_init_bs(void);
+extern kmem_cache_t_bs *
+kmem_cache_create_bs(const char *name, size_t size, size_t align,
+		unsigned long flags,
+		void (*ctor)(void *, kmem_cache_t_bs *, unsigned long),
+		void (*dtor)(void *, kmem_cache_t_bs *, unsigned long));
+extern int kmem_cache_destroy_bs(kmem_cache_t_bs *cachep);
+void *kmem_cache_alloc_bs(kmem_cache_t_bs *, gfp_t_bs);
 
 #ifndef CONFIG_DEBUG_SLAB
 extern void *__kmalloc_bs(size_t, gfp_t_bs);
@@ -67,12 +73,6 @@ extern void *__kmalloc_track_caller_bs(size_t, gfp_t_bs, void*);
 #endif
 
 void kfree_bs(const void *objp);
-kmem_cache_t_bs *
-kmem_cache_create_bs(const char *name, size_t size, size_t align,
-		unsigned long flags,
-		void (*ctor)(void *, kmem_cache_t_bs *, unsigned long),
-		void (*dtor)(void *, kmem_cache_t_bs *, unsigned long));
-extern int kmem_cache_destroy_bs(kmem_cache_t_bs *cachep);
 extern int kmem_cache_shrink_bs(kmem_cache_t_bs *cachep);
 extern void *kzalloc_bs(size_t, gfp_t);
 
@@ -120,11 +120,36 @@ static inline void *kmem_cache_alloc_node_bs(kmem_cache_t_bs *cachep,
 }
 
 extern int FASTCALL_BS(kmem_ptr_validate_bs(kmem_cache_t_bs *, void *));
+
 #else /* CONFIG_SLOB_BS */
 
 /* SLOB allocator routines */
+extern void __init kmem_cache_init_bs(void);
+extern kmem_cache_t_bs *
+kmem_cache_create_bs(const char *name, size_t size, size_t align,
+		unsigned long flags,
+		void (*ctor)(void *, kmem_cache_t_bs *, unsigned long),
+		void (*dtor)(void *, kmem_cache_t_bs *, unsigned long));
+extern int kmem_cache_destroy_bs(kmem_cache_t_bs *cachep);
+void *kmem_cache_alloc_bs(kmem_cache_t_bs *, gfp_t_bs);
+void kmem_cache_free_bs(struct kmem_cache_bs *c, void *b);
+void *kmalloc_bs(size_t size, gfp_t_bs gfp);
+void kfree_bs(const void *block);
+void *kzalloc_bs(size_t size, gfp_t_bs flags);
+const char *kmem_cache_name_bs(struct kmem_cache_bs *c);
+unsigned int kmem_cache_size_bs(struct kmem_cache_bs *c);
+extern unsigned int ksize_bs(const void *block);
 
-#define kmem_cache_shrink_bs(d) (0)
+static inline void *kcalloc_bs(size_t n, size_t size, gfp_t_bs flags)
+{
+	return kzalloc_bs(n * size, flags);
+}
+
+#define kmem_cache_shrink_bs(d)			(0)
+#define kmem_cache_reap_bs(a)
+#define kmem_ptr_validate_bs(a, b)		(0)
+#define kmem_cache_alloc_node_bs(c, f, n)	kmem_cache_alloc_bs(c, f)
+#define kmalloc_node_bs(s, f, n)		kmalloc_bs(s, f)
 
 #endif
 #endif
